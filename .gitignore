@@ -5,3 +5,5 @@ __pycache__/
 evidence/
 outputs/
 .env
+# Source downloads are large; SOURCES.csv lets anyone fetch them again.
+demo_videos/raw/
