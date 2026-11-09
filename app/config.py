@@ -17,6 +17,9 @@ CONF = 0.35
 # Image size the model sees, in pixels; 640 is the standard YOLOv8 size and works on CPU.
 IMGSZ = 640
 
+# YOLO class number for "person"; class 0 of the 80 COCO classes, the only one we count.
+PERSON_CLASS_ID = 0
+
 # Width every frame is resized to, in pixels; smaller frames are faster to process and draw.
 FRAME_WIDTH = 640
 

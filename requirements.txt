@@ -3,7 +3,11 @@
 #   py -3.12 -m venv .venv
 #   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 fastapi==0.162.2
+lap==0.5.14
 numpy==2.5.4
 opencv-python==5.0.0.93
 ultralytics==8.4.208
 uvicorn[standard]==0.54.0
+
+# Note: lap is the small solver library ultralytics needs for ByteTrack. It is not a
+# separate feature; ultralytics installs it automatically on the first tracking call.
