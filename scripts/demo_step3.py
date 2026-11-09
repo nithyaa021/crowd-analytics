@@ -110,6 +110,25 @@ def print_changes(previous: dict[str, str], counts: dict[str, int], zones: list[
         previous[zone.name] = status
 
 
+def open_writer(destination: Path, frame: np.ndarray, output_fps: float) -> cv2.VideoWriter:
+    """Creates the MP4 writer from the first frame, because the size must be known up front.
+
+    Why output_fps and not the source fps: only every STRIDE-th frame is written, so writing at
+    the source rate would play the clip at double speed and make every printed timestamp drift
+    away from the player's clock. fps / STRIDE keeps the duration correct.
+
+    Why a helper: a silently failing VideoWriter leaves a zero-byte file that looks like a
+    rendering bug, so creation and the failure check live together.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    height, width = frame.shape[:2]
+    writer = cv2.VideoWriter(str(destination), fourcc, output_fps, (width, height))
+    if not writer.isOpened():
+        raise SystemExit(f"Cannot write video: {destination}")
+    return writer
+
+
 def annotate(clip_path: Path) -> None:
     """Runs detection, counting and zone drawing over the whole clip and saves an MP4."""
     capture, fps = open_clip(clip_path)
@@ -147,11 +166,8 @@ def annotate(clip_path: Path) -> None:
             draw_status_strip(frame, total_text(counts))
 
             if writer is None:
-                height, width = frame.shape[:2]
-                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-                writer = cv2.VideoWriter(str(destination), fourcc, fps, (width, height))
-                if not writer.isOpened():
-                    raise SystemExit(f"Cannot write video: {destination}")
+                # One written frame stands for STRIDE source frames, so the file must play slower.
+                writer = open_writer(destination, frame, fps / config.STRIDE)
             writer.write(frame)
             written += 1
         frame_index += 1

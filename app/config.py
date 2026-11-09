@@ -42,6 +42,17 @@ NEAR_RATIO = 0.8
 # Multiplier applied to the heatmap every frame (0.995 ≈ a hot spot fades to 61% after 100 frames).
 HEAT_DECAY = 0.995
 
+# Blur width for the drawn heatmap, as a fraction of the frame width; 0.05 at 640 px = a 33 px
+# kernel, which turns single-pixel hits into a visible soft blob.
+HEAT_BLUR_FRACTION = 0.05
+
+# A heatmap pixel is drawn only if it holds at least this fraction of the hottest pixel, so the
+# empty parts of the floor stay clean instead of being tinted blue.
+HEAT_MASK_RATIO = 0.08
+
+# How strongly the heatmap colour replaces the video where the mask is true (0.5 = half and half).
+HEAT_OVERLAY_ALPHA = 0.5
+
 # Seconds a lost track ID is remembered before we treat the person as gone.
 TRACK_GRACE = 2.0
 
