@@ -1,1 +1,854 @@
-/* Styling placeholder. The Tailwind-based dashboard styles are added in a later step. */
+/* Crowd Analytics dashboard: design tokens and component styles.
+ *
+ * Why this file is separate from the Tailwind CDN: Tailwind supplies layout (grid, flex,
+ * spacing), but everything visual that makes this look like one product lives here. The
+ * palette is declared once in :root, so re-theming the whole dashboard is one edit, and
+ * the sample data can change without a single style being touched.
+ */
+
+:root {
+  /* ---------- Surfaces ---------- */
+  --bg: #070b14;
+  --panel: #0d1424;
+  /* The card fill is translucent on purpose: the page's radial glows show through it. */
+  --card: rgba(17, 26, 46, 0.72);
+  --border: rgba(255, 255, 255, 0.08);
+  /* A brighter border for the one element that is currently "hot". */
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* ---------- Semantic colour ---------- */
+  --accent: #38bdf8;
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --crit: #ef4444;
+  --text: #e6edf7;
+  --muted: #8fa3bf;
+
+  /* ---------- Shape ---------- */
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 40px -20px rgba(0, 0, 0, 0.85);
+  --shadow-hot: 0 0 0 1px rgba(239, 68, 68, 0.35), 0 18px 44px -22px rgba(239, 68, 68, 0.55);
+}
+
+/* ---------- Base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Anchors scroll under the sticky bar instead of behind it. */
+  scroll-padding-top: 88px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg);
+  /* Two soft glows give the flat navy some depth. "fixed" keeps them still while scrolling. */
+  background-image:
+    radial-gradient(900px 520px at 12% -12%, rgba(56, 189, 248, 0.1), transparent 62%),
+    radial-gradient(760px 460px at 96% -6%, rgba(34, 197, 94, 0.07), transparent 58%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every counter uses tabular figures so digits keep their column while values change.
+   Why it matters: without this, "9" is narrower than "0" and the KPI numbers jitter every tick. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------- The glass card ---------- */
+
+.glass {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  /* The blur is what makes the card read as glass: it samples the page glow behind it. */
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+}
+
+/* The congestion source of a warning gets a faint red edge, so the eye finds it first. */
+.glass.is-hot {
+  border-color: rgba(239, 68, 68, 0.32);
+  box-shadow: var(--shadow-hot);
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.icon-badge {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent);
+  flex: none;
+}
+
+.icon-badge svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ---------- Top bar ---------- */
+
+.logo-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(150deg, rgba(56, 189, 248, 0.9), rgba(56, 189, 248, 0.35));
+  color: #04121f;
+  box-shadow: 0 0 22px -6px rgba(56, 189, 248, 0.8);
+  flex: none;
+}
+
+.logo-mark svg {
+  width: 19px;
+  height: 19px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- Live pill ---------- */
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The dot itself is solid; the ring around it is an animated box-shadow, which costs less
+   than animating a real element and never shifts the layout. */
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ok);
+  animation: pulse-ring 2s infinite;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+/* ---------- Source select and chips ---------- */
+
+.source-select {
+  appearance: none;
+  padding: 6px 30px 6px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background-color: rgba(255, 255, 255, 0.04);
+  /* The chevron is an inline SVG data URI so no icon library is needed. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238FA3BF' stroke-width='2.2' stroke-linecap='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 13px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.chip-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chip-meta strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- Congestion banner ---------- */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  /* A red gradient, not a flat fill: the eye reads it as an alarm even at a glance. */
+  background: linear-gradient(90deg, #7f1d1d 0%, #dc2626 38%, #ef4444 62%, #991b1b 100%);
+  border: 1px solid rgba(255, 160, 160, 0.35);
+  box-shadow: 0 10px 30px -12px rgba(239, 68, 68, 0.65);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.banner[hidden] {
+  display: none;
+}
+
+.banner-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  animation: banner-pulse 1.6s ease-in-out infinite;
+}
+
+.banner-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes banner-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(0.92); }
+}
+
+.banner-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.banner-text .banner-count {
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+/* ---------- KPI cards ---------- */
+
+.kpi-card {
+  padding: 15px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kpi-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.kpi-value {
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-value .unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 3px;
+  letter-spacing: 0;
+}
+
+.kpi-label {
+  margin-top: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.kpi-caption {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Video card ---------- */
+
+.video-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #04070f;
+  /* A faint inner ring stops the video edge from dissolving into the card. */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.video-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Until the stream URL is set, the <img> has no src. Browsers render a broken-image glyph and
+   the alt text in that state, which would sit on top of the "Video appears here" placeholder.
+   Hiding the element while it has no source avoids that without any JavaScript. */
+.video-frame img:not([src]) {
+  display: none;
+}
+
+.video-idle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 12px;
+}
+
+.video-idle svg {
+  width: 26px;
+  height: 26px;
+  opacity: 0.6;
+  margin: 0 auto 6px;
+}
+
+.video-idle[hidden] {
+  display: none;
+}
+
+.overlay-toggles {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  /* The backdrop is what keeps the chips readable over a bright video frame. */
+  padding: 5px;
+  border-radius: 10px;
+  background: rgba(4, 8, 16, 0.55);
+  border: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.chip svg {
+  width: 13px;
+  height: 13px;
+}
+
+.chip:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* aria-pressed is the source of truth, so the visual state can never disagree with what a
+   screen reader announces. */
+.chip[aria-pressed="true"] {
+  color: #04121f;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.chip[aria-pressed="false"] {
+  color: var(--muted);
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: rgba(4, 8, 16, 0.55);
+  color: var(--text);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- Ring gauges ---------- */
+
+.gauge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gauge-card {
+  min-width: 0;
+  padding: 12px 8px 11px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.022);
+  text-align: center;
+}
+
+.gauge-card.is-hot {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.gauge {
+  display: block;
+  width: 100%;
+  max-width: 118px;
+  margin: 0 auto;
+}
+
+/* The track is the unfilled ring; the value arc is drawn on top of it. */
+.gauge-track {
+  stroke: rgba(255, 255, 255, 0.07);
+}
+
+.gauge-arc {
+  stroke-linecap: round;
+  /* Animating dashoffset is what makes the ring "fill" on first paint. */
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gauge-num {
+  fill: var(--text);
+  font-size: 27px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.gauge-cap {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.gauge-name {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gauge-dwell {
+  margin-top: 5px;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Status chip ---------- */
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-chip svg {
+  width: 10px;
+  height: 10px;
+}
+
+.status-chip.ok {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.status-chip.near {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.32);
+}
+
+.status-chip.over {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.36);
+}
+
+/* ---------- Alert log ---------- */
+
+.alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  /* The log scrolls inside its card, so a long history never pushes the page down. */
+  max-height: 342px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 3px;
+}
+
+.alert-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px 8px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+
+.alert-row.is-active {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+/* The severity bar is absolutely positioned so it can hug the rounded left edge. */
+.alert-sev {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--muted);
+}
+
+.alert-sev.crit { background: var(--crit); }
+.alert-sev.warn { background: var(--warn); }
+.alert-sev.ok { background: var(--ok); }
+
+/* Placeholder thumbnail: an empty frame with a faint image glyph, standing in for the
+   evidence JPEG that the real backend will serve. */
+.alert-thumb {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(255, 255, 255, 0.02));
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  overflow: hidden;
+}
+
+.alert-thumb svg {
+  width: 15px;
+  height: 15px;
+  opacity: 0.75;
+}
+
+.alert-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.alert-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.alert-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.alert-time {
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.alert-zone {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-meta {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-tag {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.alert-tag.active {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.alert-tag.cleared {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 30px 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.empty-state svg {
+  width: 26px;
+  height: 26px;
+  opacity: 0.5;
+}
+
+/* ---------- Skeletons ---------- */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+/* The moving highlight is a pseudo-element sweeping across; it never changes the layout. */
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.09), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-line { height: 10px; }
+.skeleton-value { height: 26px; width: 62%; }
+.skeleton-ring { height: 96px; width: 96px; border-radius: 999px; margin: 0 auto; }
+.skeleton-row { height: 46px; border-radius: 11px; }
+
+/* ---------- Dev preview controls (temporary, removed in P7) ---------- */
+
+.dev-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px dashed rgba(143, 163, 191, 0.32);
+  background: rgba(143, 163, 191, 0.05);
+}
+
+.dev-cluster .dev-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dev-btn {
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dev-btn:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+/* ---------- Focus and scrollbars ---------- */
+
+/* A visible ring on keyboard focus only: mouse users never see it, keyboard users always do. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.alert-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.alert-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.alert-list::-webkit-scrollbar-thumb {
+  background: rgba(143, 163, 191, 0.28);
+  border-radius: 999px;
+}
+
+.alert-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(143, 163, 191, 0.5);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 420px) {
+  /* At 360-420 px the ring is the only thing that can shrink without losing meaning. */
+  .gauge {
+    max-width: 96px;
+  }
+
+  .kpi-value {
+    font-size: 25px;
+  }
+
+  .gauge-num {
+    font-size: 24px;
+  }
+
+  /* The source picker is the widest flexible item in the bar. Capping it keeps the product
+     name readable instead of letting the select squeeze it to one letter. */
+  .source-select {
+    max-width: 132px;
+    padding-right: 26px;
+  }
+
+  /* The clock is the least important item in the bar on a phone. Dropping it buys the space
+     the product name and the source picker need to stay readable. */
+  #clock {
+    display: none;
+  }
+}
+
+/* ---------- Reduced motion ---------- */
+
+/* Why: users who ask their OS for less motion get no pulsing, no shimmer and no ring sweep.
+   The ring still shows the correct value, it just appears instantly instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .skeleton::after {
+    display: none;
+  }
+
+  .skeleton {
+    background: rgba(255, 255, 255, 0.07);
+  }
+}

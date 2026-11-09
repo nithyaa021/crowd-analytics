@@ -3,43 +3,315 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Crowd Density and Bottleneck Analytics</title>
-  <style>
-    /* A deliberately bare page: step P5 only proves the backend works. The real dashboard with
-       Tailwind and Chart.js arrives in the next step, so no build step is introduced here. */
-    body { font-family: system-ui, sans-serif; margin: 16px; background: #111; color: #eee; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
-    /* The MJPEG stream is just an <img>: the browser replaces the picture on each part. */
-    img { width: 640px; max-width: 100%; border: 1px solid #333; background: #000; }
-    pre {
-      width: 640px; max-width: 100%; height: 320px; overflow: auto;
-      background: #000; color: #0f0; padding: 8px; font-size: 12px;
-      border: 1px solid #333;
-    }
-  </style>
+  <title>Crowd Analytics — Density &amp; Bottleneck Monitor</title>
+  <meta name="description" content="Live crowd density, zone capacity and bottleneck analytics dashboard.">
+
+  <!-- Inter is loaded from Google Fonts; the CSS falls back to system UI fonts if it is blocked. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind supplies layout utilities only. Every visual token lives in style.css. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js draws the headcount line. It is the only charting library we use. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
-  <h1>Crowd Density and Bottleneck Analytics</h1>
-  <!-- The browser keeps the connection open and paints each new JPEG part. -->
-  <img src="/video" alt="live annotated video">
-  <!-- Raw WebSocket JSON, printed as it arrives, so the contract can be checked by eye. -->
-  <pre id="snapshot">connecting...</pre>
+  <!-- ============ 1. Sticky top bar ============ -->
+  <header class="sticky top-0 z-40 border-b border-white/[0.07] bg-[#070B14]/80 backdrop-blur-xl">
+    <div class="mx-auto max-w-[1440px] px-3 sm:px-5">
+      <div class="flex h-[58px] items-center gap-2.5 sm:gap-3">
 
-  <script>
-    // Open a WebSocket and print every snapshot it pushes. This is intentionally the smallest
-    // possible client: it proves the stream works before any dashboard code exists.
-    const target = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
-    const output = document.getElementById("snapshot");
-    const socket = new WebSocket(target);
+        <!-- Logo mark: three bars of rising height, drawn as inline SVG so no icon pack is needed. -->
+        <div class="logo-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+               stroke-linecap="round">
+            <path d="M4 19V13"></path>
+            <path d="M10 19V8"></path>
+            <path d="M16 19V4"></path>
+          </svg>
+        </div>
 
-    socket.onmessage = (event) => {
-      // Pretty-print so the nested "zones" list is readable instead of one long line.
-      output.textContent = JSON.stringify(JSON.parse(event.data), null, 2);
-    };
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="truncate text-[15px] font-semibold tracking-tight sm:text-base">
+              Crowd Analytics
+            </h1>
+            <!-- The tag is hidden on phones: at 360 px it competes with the title and the
+                 title truncates to a single letter, which reads as a rendering bug. -->
+            <span class="tag hidden sm:inline-flex">Track A</span>
+          </div>
+          <!-- Hidden on the narrowest phones so the bar never wraps. -->
+          <p class="hidden truncate text-[11px] text-[var(--muted)] sm:block">
+            Density &amp; bottleneck monitor
+          </p>
+        </div>
 
-    socket.onclose = () => {
-      output.textContent = "WebSocket closed. Reload the page to reconnect.";
-    };
-  </script>
+        <div class="ml-auto flex items-center gap-2 sm:gap-2.5">
+          <!-- Source picker: the options are filled from the sample data by app.js. -->
+          <label class="sr-only" for="source-select">Source clip</label>
+          <select id="source-select" class="source-select">
+            <option value="">Loading…</option>
+          </select>
+
+          <!-- The LIVE pill is hidden on very small screens; the clock follows it. -->
+          <span class="live-pill hidden sm:inline-flex" title="Engine is running">
+            <span class="live-dot" aria-hidden="true"></span>
+            Live
+          </span>
+
+          <span class="chip-meta hidden md:inline-flex" title="Processing frames per second">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"></path>
+            </svg>
+            <strong class="tnum" id="fps-chip">8.4</strong> fps
+          </span>
+
+          <span class="chip-meta tnum" id="clock" title="Current time">--:--:--</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-[1440px] px-3 pb-10 pt-3 sm:px-5 sm:pt-4">
+
+    <!-- ============ 2. Congestion banner ============ -->
+    <!-- Rendered by app.js in both states. Hidden by default so there is no flash of a
+         stale banner before the first render. -->
+    <div class="mb-3 flex flex-col gap-2">
+      <div id="congestion-banner" class="banner" role="status" aria-live="polite" hidden>
+        <span class="banner-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <path d="M12 9v4"></path>
+            <path d="M12 17h.01"></path>
+          </svg>
+        </span>
+        <span class="banner-text" id="banner-text"></span>
+      </div>
+
+      <!-- TEMPORARY dev control for P6: proves both banner states without a live engine.
+           This cluster is deleted in P7 when real data drives the banner. -->
+      <div class="dev-cluster">
+        <span class="dev-label">Dev · preview</span>
+        <button type="button" class="dev-btn" id="dev-banner-ok">Banner: OK</button>
+        <button type="button" class="dev-btn" id="dev-banner-over">Banner: OVER</button>
+        <button type="button" class="dev-btn" id="dev-skeleton">Show skeletons</button>
+        <button type="button" class="dev-btn" id="dev-empty">Empty alert log</button>
+      </div>
+    </div>
+
+    <!-- ============ 3. KPI row ============ -->
+    <!-- 2x2 on phones, 4 across from 1024 px up. -->
+    <section aria-label="Key metrics"
+             class="mb-3 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+      <article class="glass kpi-card" id="kpi-people">
+        <div class="kpi-top">
+          <span class="icon-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </span>
+        </div>
+        <div class="kpi-value tnum" data-kpi="people">—</div>
+        <div class="kpi-label">People now</div>
+        <div class="kpi-caption" data-kpi-caption="people">inside monitored zones</div>
+      </article>
+
+      <article class="glass kpi-card" id="kpi-peak">
+        <div class="kpi-top">
+          <span class="icon-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 17l6-6 4 4 7-7"></path>
+              <path d="M14 8h6v6"></path>
+            </svg>
+          </span>
+        </div>
+        <div class="kpi-value tnum" data-kpi="peak">—</div>
+        <div class="kpi-label">Peak (session)</div>
+        <div class="kpi-caption" data-kpi-caption="peak">highest frame so far</div>
+      </article>
+
+      <article class="glass kpi-card" id="kpi-dwell">
+        <div class="kpi-top">
+          <span class="icon-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 7v5l3 2"></path>
+            </svg>
+          </span>
+        </div>
+        <div class="kpi-value tnum" data-kpi="dwell">—</div>
+        <div class="kpi-label">Average dwell</div>
+        <div class="kpi-caption" data-kpi-caption="dwell">time spent per visit</div>
+      </article>
+
+      <article class="glass kpi-card" id="kpi-fps">
+        <div class="kpi-top">
+          <span class="icon-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"></path>
+            </svg>
+          </span>
+        </div>
+        <div class="kpi-value tnum" data-kpi="fps">—</div>
+        <div class="kpi-label">Processing FPS</div>
+        <div class="kpi-caption" data-kpi-caption="fps">detections per second</div>
+      </article>
+    </section>
+
+    <!-- ============ 4. Main grid ============ -->
+    <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
+
+      <!-- ---------- Left column, 8/12 ---------- -->
+      <div class="flex min-w-0 flex-col gap-3 lg:col-span-8">
+
+        <!-- Video card -->
+        <section class="glass p-2.5 sm:p-3" aria-label="Live video">
+          <div class="mb-2 flex items-center justify-between gap-2 px-0.5">
+            <span class="section-title">Live feed</span>
+            <span class="chip-meta" id="video-source-chip">sample.mp4</span>
+          </div>
+
+          <div class="video-frame">
+            <!-- The stream URL is built by app.js so the overlay flags travel with it. -->
+            <img id="video" alt="Live annotated video with detection boxes and zone overlays">
+
+            <!-- Shown until a real stream is attached; replaced by the poster in P7. -->
+            <div class="video-idle" id="video-idle">
+              <div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                  <path d="M10 9l5 3-5 3V9z"></path>
+                </svg>
+                Video appears here
+                <div style="font-size:10.5px;opacity:.7;margin-top:2px">
+                  sample data · no stream yet
+                </div>
+              </div>
+            </div>
+
+            <div class="overlay-toggles" role="group" aria-label="Video overlays">
+              <button type="button" class="chip" id="toggle-boxes" aria-pressed="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" aria-hidden="true">
+                  <rect x="3" y="3" width="8" height="8" rx="1"></rect>
+                  <rect x="13" y="13" width="8" height="8" rx="1"></rect>
+                </svg>
+                Boxes
+              </button>
+              <button type="button" class="chip" id="toggle-zones" aria-pressed="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path>
+                  <path d="M9 3v15"></path>
+                  <path d="M15 6v15"></path>
+                </svg>
+                Zones
+              </button>
+              <button type="button" class="chip" id="toggle-heat" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 2c1.5 4 4 5.5 4 9a4 4 0 0 1-8 0c0-1.5.6-2.6 1.4-3.6"></path>
+                  <path d="M12 22a6 6 0 0 1-6-6"></path>
+                </svg>
+                Heatmap
+              </button>
+            </div>
+
+            <button type="button" class="icon-button" id="fullscreen"
+                    title="Fullscreen" aria-label="Toggle fullscreen"
+                    style="position:absolute;right:10px;top:10px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                <path d="M16 3h3a2 2 0 0 1 2 2v3"></path>
+                <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+                <path d="M8 21H5a2 2 0 0 1-2-2v-3"></path>
+              </svg>
+            </button>
+          </div>
+        </section>
+
+        <!-- Headcount chart -->
+        <section class="glass p-3 sm:p-4" aria-label="Headcount over time">
+          <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="section-title">Headcount</span>
+              <p class="mt-0.5 text-[11px] text-[var(--muted)]">last 60 samples</p>
+            </div>
+            <!-- The legend is written as HTML, so the capacity line is labelled without
+                 relying on Chart.js's own legend rendering. -->
+            <div class="flex items-center gap-3 text-[10.5px] text-[var(--muted)]">
+              <span class="inline-flex items-center gap-1.5">
+                <span style="width:14px;height:2px;border-radius:2px;background:var(--accent)"></span>
+                People
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span style="width:14px;height:2px;border-radius:2px;
+                             background:repeating-linear-gradient(90deg,var(--crit) 0 4px,transparent 4px 7px)">
+                </span>
+                Capacity
+              </span>
+            </div>
+          </div>
+          <div style="position:relative;height:190px">
+            <canvas id="headcount-chart" aria-label="Headcount over time chart" role="img"></canvas>
+          </div>
+        </section>
+      </div>
+
+      <!-- ---------- Right column, 4/12 ---------- -->
+      <div class="flex min-w-0 flex-col gap-3 lg:col-span-4">
+
+        <!-- Zone gauges -->
+        <section class="glass p-3" aria-label="Zone occupancy">
+          <div class="mb-2.5 flex items-center justify-between">
+            <span class="section-title">Zones</span>
+            <span class="chip-meta" id="zones-summary">—</span>
+          </div>
+          <!-- Filled by renderGauges(); the placeholder shows how a skeleton looks. -->
+          <div class="gauge-grid" id="zone-gauges">
+            <div class="gauge-card">
+              <div class="skeleton skeleton-ring"></div>
+              <div class="skeleton skeleton-line" style="width:70%;margin:8px auto 0"></div>
+            </div>
+            <div class="gauge-card">
+              <div class="skeleton skeleton-ring"></div>
+              <div class="skeleton skeleton-line" style="width:70%;margin:8px auto 0"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Alert log -->
+        <section class="glass flex-1 p-3" aria-label="Alert log">
+          <div class="mb-2.5 flex items-center justify-between gap-2">
+            <span class="section-title">Alert log</span>
+            <span class="chip-meta" id="alerts-summary">—</span>
+          </div>
+          <ul class="alert-list" id="alert-list" aria-live="polite"></ul>
+        </section>
+      </div>
+    </div>
+
+    <p class="mt-4 text-center text-[10.5px] text-[var(--muted)]">
+      Sample data · backend stream arrives in the next step
+    </p>
+  </main>
+
+  <script src="/static/app.js"></script>
 </body>
 </html>
