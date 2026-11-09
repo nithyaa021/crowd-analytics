@@ -1,0 +1,9 @@
+# Exact versions installed and tested in step P0 (Windows, Python 3.12.10, CPU only).
+# Rebuild the same environment with:
+#   py -3.12 -m venv .venv
+#   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+fastapi==0.162.2
+numpy==2.5.4
+opencv-python==5.0.0.93
+ultralytics==8.4.208
+uvicorn[standard]==0.54.0
