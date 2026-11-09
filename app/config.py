@@ -67,6 +67,20 @@ MJPEG_MAX_FPS = 15
 # Seconds between live status messages pushed to the dashboard over WebSocket.
 WS_INTERVAL = 0.5
 
+# ---------- Backend loop ----------
+
+# Video seconds between two head-count rows in the database (2 s keeps a 1-minute chart small).
+HEADCOUNT_INTERVAL = 2.0
+
+# How many recent frame durations the moving-average FPS is computed over (20 ≈ 3 s of video).
+FPS_WINDOW = 20
+
+# URL path the evidence photos are served from; also stored in alerts.keyframe.
+EVIDENCE_URL_PREFIX = "/evidence"
+
+# Default source when the engine starts and when no other clip is asked for.
+DEFAULT_SOURCE = "crowded.mp4"
+
 # ---------- Folders and files (absolute, so the app works from any working directory) ----------
 
 # Project root, i.e. the folder that contains app/, static/, tests/ ...

@@ -4,9 +4,42 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crowd Density and Bottleneck Analytics</title>
+  <style>
+    /* A deliberately bare page: step P5 only proves the backend works. The real dashboard with
+       Tailwind and Chart.js arrives in the next step, so no build step is introduced here. */
+    body { font-family: system-ui, sans-serif; margin: 16px; background: #111; color: #eee; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    /* The MJPEG stream is just an <img>: the browser replaces the picture on each part. */
+    img { width: 640px; max-width: 100%; border: 1px solid #333; background: #000; }
+    pre {
+      width: 640px; max-width: 100%; height: 320px; overflow: auto;
+      background: #000; color: #0f0; padding: 8px; font-size: 12px;
+      border: 1px solid #333;
+    }
+  </style>
 </head>
 <body>
   <h1>Crowd Density and Bottleneck Analytics</h1>
-  <p>Dashboard placeholder. The live view is added in a later step.</p>
+  <!-- The browser keeps the connection open and paints each new JPEG part. -->
+  <img src="/video" alt="live annotated video">
+  <!-- Raw WebSocket JSON, printed as it arrives, so the contract can be checked by eye. -->
+  <pre id="snapshot">connecting...</pre>
+
+  <script>
+    // Open a WebSocket and print every snapshot it pushes. This is intentionally the smallest
+    // possible client: it proves the stream works before any dashboard code exists.
+    const target = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
+    const output = document.getElementById("snapshot");
+    const socket = new WebSocket(target);
+
+    socket.onmessage = (event) => {
+      // Pretty-print so the nested "zones" list is readable instead of one long line.
+      output.textContent = JSON.stringify(JSON.parse(event.data), null, 2);
+    };
+
+    socket.onclose = () => {
+      output.textContent = "WebSocket closed. Reload the page to reconnect.";
+    };
+  </script>
 </body>
 </html>
