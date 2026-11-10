@@ -51,16 +51,18 @@
         </div>
 
         <div class="ml-auto flex items-center gap-2 sm:gap-2.5">
-          <!-- Source picker: the options are filled from the sample data by app.js. -->
+          <!-- Source picker: the options are filled from GET /api/sources by app.js. -->
           <label class="sr-only" for="source-select">Source clip</label>
           <select id="source-select" class="source-select">
             <option value="">Loading…</option>
           </select>
 
-          <!-- The LIVE pill is hidden on very small screens; the clock follows it. -->
-          <span class="live-pill hidden sm:inline-flex" title="Engine is running">
+          <!-- The LIVE pill reports the WebSocket state, not the engine's: it says Connected
+               while messages arrive and Reconnecting when they stop. -->
+          <span class="live-pill is-waiting hidden sm:inline-flex" id="live-pill"
+                role="status" aria-live="polite" title="WebSocket connection state">
             <span class="live-dot" aria-hidden="true"></span>
-            Live
+            <span id="live-label">Connecting</span>
           </span>
 
           <span class="chip-meta hidden md:inline-flex" title="Processing frames per second">
@@ -68,7 +70,7 @@
                  stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"></path>
             </svg>
-            <strong class="tnum" id="fps-chip">8.4</strong> fps
+            <strong class="tnum" id="fps-chip">0.0</strong> fps
           </span>
 
           <span class="chip-meta tnum" id="clock" title="Current time">--:--:--</span>
@@ -79,10 +81,28 @@
 
   <main class="mx-auto max-w-[1440px] px-3 pb-10 pt-3 sm:px-5 sm:pt-4">
 
+    <!-- ============ 1b. Inline error bar ============ -->
+    <!-- A failed fetch or a lost connection reports itself here in one line. Why an inline bar
+         and not an alert(): window.alert blocks the video thread and cannot be styled or
+         dismissed, and the brief says the page must never go blank. -->
+    <div id="error-bar" class="error-bar" role="status" aria-live="polite" hidden>
+      <span class="error-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 8v5"></path>
+          <path d="M12 16h.01"></path>
+        </svg>
+      </span>
+      <span id="error-text">Something went wrong.</span>
+      <button type="button" class="error-retry" id="error-retry">Retry</button>
+      <button type="button" class="error-close" id="error-close" aria-label="Dismiss">×</button>
+    </div>
+
     <!-- ============ 2. Congestion banner ============ -->
-    <!-- Rendered by app.js in both states. Hidden by default so there is no flash of a
-         stale banner before the first render. -->
-    <div class="mb-3 flex flex-col gap-2">
+    <!-- Driven by the WebSocket snapshot: visible only while alerts_active > 0. Hidden by
+         default so there is no flash of a stale warning before the first message. -->
+    <div class="mb-3">
       <div id="congestion-banner" class="banner" role="status" aria-live="polite" hidden>
         <span class="banner-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
@@ -93,16 +113,6 @@
           </svg>
         </span>
         <span class="banner-text" id="banner-text"></span>
-      </div>
-
-      <!-- TEMPORARY dev control for P6: proves both banner states without a live engine.
-           This cluster is deleted in P7 when real data drives the banner. -->
-      <div class="dev-cluster">
-        <span class="dev-label">Dev · preview</span>
-        <button type="button" class="dev-btn" id="dev-banner-ok">Banner: OK</button>
-        <button type="button" class="dev-btn" id="dev-banner-over">Banner: OVER</button>
-        <button type="button" class="dev-btn" id="dev-skeleton">Show skeletons</button>
-        <button type="button" class="dev-btn" id="dev-empty">Empty alert log</button>
       </div>
     </div>
 
@@ -186,10 +196,11 @@
           </div>
 
           <div class="video-frame">
-            <!-- The stream URL is built by app.js so the overlay flags travel with it. -->
+            <!-- The src is set by app.js from the current overlay flags; until then the
+                 placeholder below is what the user sees. -->
             <img id="video" alt="Live annotated video with detection boxes and zone overlays">
 
-            <!-- Shown until a real stream is attached; replaced by the poster in P7. -->
+            <!-- Shown until the stream is attached, then hidden by app.js. -->
             <div class="video-idle" id="video-idle">
               <div>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
@@ -197,10 +208,18 @@
                   <rect x="2" y="5" width="20" height="14" rx="2"></rect>
                   <path d="M10 9l5 3-5 3V9z"></path>
                 </svg>
-                Video appears here
+                <span id="video-idle-text">Waiting for the first frame…</span>
                 <div style="font-size:10.5px;opacity:.7;margin-top:2px">
-                  sample data · no stream yet
+                  the engine takes a few seconds to load the model
                 </div>
+              </div>
+            </div>
+
+            <!-- Shown while a different clip is being switched to. -->
+            <div class="video-loading-label" id="video-loading-label" hidden>
+              <div>
+                <div class="dot" aria-hidden="true"></div>
+                Loading clip…
               </div>
             </div>
 
@@ -251,14 +270,18 @@
           <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div>
               <span class="section-title">Headcount</span>
-              <p class="mt-0.5 text-[11px] text-[var(--muted)]">last 60 samples</p>
+              <p class="mt-0.5 text-[11px] text-[var(--muted)]" id="chart-window">
+                last 120 samples
+              </p>
             </div>
             <!-- The legend is written as HTML, so the capacity line is labelled without
-                 relying on Chart.js's own legend rendering. -->
-            <div class="flex items-center gap-3 text-[10.5px] text-[var(--muted)]">
+                 relying on Chart.js's own legend rendering. The zone swatches are added by
+                 app.js once /api/zones has answered. -->
+            <div class="flex flex-wrap items-center gap-3 text-[10.5px] text-[var(--muted)]"
+                 id="chart-legend">
               <span class="inline-flex items-center gap-1.5">
                 <span style="width:14px;height:2px;border-radius:2px;background:var(--accent)"></span>
-                People
+                Total
               </span>
               <span class="inline-flex items-center gap-1.5">
                 <span style="width:14px;height:2px;border-radius:2px;
@@ -307,10 +330,41 @@
       </div>
     </div>
 
-    <p class="mt-4 text-center text-[10.5px] text-[var(--muted)]">
-      Sample data · backend stream arrives in the next step
+    <p class="mt-4 text-center text-[10.5px] text-[var(--muted)]" id="footer-status">
+      Connecting to the engine…
     </p>
   </main>
+
+  <!-- ============ 6. Toast ============ -->
+  <!-- A new alert announces itself for a few seconds. aria-live="assertive" because an
+       over-capacity zone is exactly the news that should interrupt a screen reader. -->
+  <div class="toast-stack" id="toast-stack" aria-live="assertive" aria-atomic="false"></div>
+
+  <!-- ============ 7. Evidence modal ============ -->
+  <!-- Why a <dialog>: the browser gives focus trapping, Escape-to-close and an inert backdrop
+       for free, which a hand-rolled overlay has to reimplement and usually gets wrong. -->
+  <dialog id="evidence-modal" class="evidence-modal" aria-labelledby="evidence-title">
+    <div class="evidence-head">
+      <div class="min-w-0">
+        <div class="section-title">Evidence</div>
+        <h2 class="evidence-title" id="evidence-title">Alert</h2>
+      </div>
+      <button type="button" class="icon-button" id="evidence-close" aria-label="Close evidence">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" aria-hidden="true">
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="evidence-body">
+      <img id="evidence-image" alt="Snapshot taken when the alert fired">
+      <p class="evidence-empty" id="evidence-empty" hidden>
+        No snapshot was saved for this alert.
+      </p>
+    </div>
+    <div class="evidence-meta" id="evidence-meta"></div>
+  </dialog>
 
   <script src="/static/app.js"></script>
 </body>

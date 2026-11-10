@@ -1,13 +1,22 @@
-/* Crowd Analytics dashboard — sample data and render functions.
+/* Crowd Analytics dashboard — live data client.
  *
- * Why sample data lives here and not in index.html: the next step replaces this one object with
- * live WebSocket snapshots. Keeping every number in one place means that swap touches the data
- * source only, never the rendering. Each render function reads a shape rather than a hard-coded
- * value, so the shapes below are a contract:
+ * This file replaces the P6 sample object with real data from the server. The render functions
+ * are the same ones P6 wrote; what changes is where their input comes from:
  *
- *   SAMPLE.zones  -> [{ name, count, capacity, status, avgDwell, maxDwell }]
- *   SAMPLE.alerts -> [{ id, zone, startedAt, peak, capacity, active, keyframe }]
- *   SAMPLE.chart  -> { labels: [...], values: [...], capacity: number }
+ *   /api/zones     -> the gauge list (zone names and capacities)
+ *   /api/alerts    -> the alert log history
+ *   /api/history   -> the first 120 chart points
+ *   /api/sources   -> the clip dropdown
+ *   /ws            -> one snapshot every 0.5 s: the KPI numbers, gauge counts, banner and
+ *                     chart point
+ *
+ * Two shapes are worth keeping in mind, because everything below works with one or the other:
+ *
+ *   snapshot zone (from /ws):  { name, count, capacity, fill, status, over_for, avg_dwell, max_dwell }
+ *   api zone (from /api/zones): { name, capacity, polygon }
+ *
+ * The snapshot is the live truth. /api/zones only tells us which zones exist and how big they
+ * are, so the gauges can be drawn before the first message arrives.
  *
  * Vanilla JavaScript only. No framework, no build step, no icon library.
  */
@@ -15,162 +24,85 @@
 "use strict";
 
 /* ---------------------------------------------------------------------------
- * 1. Sample data
+ * 1. Settings and state
  * ------------------------------------------------------------------------- */
 
-/**
- * Picks a reproducible pseudo-random number in [0, 1).
- *
- * Why not Math.random(): the chart must look identical on every reload, so a screenshot in the
- * docs always matches what a reviewer sees. A seeded generator gives that for free.
- *
- * @param {number} seed - any integer; the same seed always yields the same sequence.
- * @returns {number} a value between 0 and 1.
- */
-function seeded(seed) {
-  // A sine-based hash: cheap, deterministic, and good enough for cosmetic wobble.
-  const x = Math.sin(seed * 12.9898) * 43758.5453;
-  return x - Math.floor(x);
-}
+/** How long a KPI number takes to travel to its new value, in milliseconds. */
+const KPI_ANIM_MS = 300;
 
-/**
- * Builds the 60 headcount samples shown in the line chart.
- *
- * Why 60: sixty points across a 2-minute window is dense enough to look like real telemetry and
- * light enough to stay readable on a phone.
- *
- * @returns {{labels: string[], values: number[]}} labels as mm:ss, values as people in frame.
- */
-function buildHeadcountSeries() {
-  const labels = [];
-  const values = [];
-  const now = new Date();
+/** How many points the chart keeps. 120 points at 2 s each is four minutes of history. */
+const CHART_MAX_POINTS = 120;
 
-  for (let i = 0; i < 60; i += 1) {
-    // Walk backwards from "now", one sample every 2 seconds.
-    const moment = new Date(now.getTime() - (59 - i) * 2000);
-    const minutes = String(moment.getMinutes()).padStart(2, "0");
-    const seconds = String(moment.getSeconds()).padStart(2, "0");
-    labels.push(`${minutes}:${seconds}`);
+/** Reconnect backoff: start at 1 s, double it, never wait longer than 10 s. */
+const RECONNECT_MIN_MS = 1000;
+const RECONNECT_MAX_MS = 10000;
 
-    // A slow rise into the middle of the window, then a partial recovery: the shape of a
-    // crowd building at an entrance and thinning out once the queue moves.
-    const trend = 6 + 5 * Math.sin((i / 59) * Math.PI);
-    const noise = (seeded(i) - 0.5) * 3;
-    values.push(Math.max(0, Math.round(trend + noise)));
-  }
+/** How long a toast stays on screen, and how long the new alert row keeps its flash. */
+const TOAST_MS = 5000;
+const FLASH_MS = 1600;
 
-  return { labels, values };
-}
-
-const SAMPLE = {
-  source: "crowded.mp4",
-  sources: ["crowded.mp4", "mid.mp4", "normal.mp4"],
-  fps: 8.4,
-  peakPeople: 15,
-
-  // Two zones on purpose: one comfortably OK and one over capacity, so both visual states of
-  // the gauge and the status chip are visible on a single screen.
-  // overFor is the seconds count from AlertDebouncer.over_for; the banner reads only this.
-  zones: [
-    {
-      name: "Main Zone",
-      count: 12,
-      capacity: 10,
-      status: "OVER",
-      overFor: 12,
-      avgDwell: 18.4,
-      maxDwell: 47.0,
-    },
-    {
-      name: "Entrance",
-      count: 4,
-      capacity: 8,
-      status: "OK",
-      overFor: 0,
-      avgDwell: 6.2,
-      maxDwell: 11.5,
-    },
-  ],
-
-  // Six alerts: the newest still running, the rest closed. Two severities so the coloured
-  // left bar and both tag styles are exercised.
-  alerts: [
-    {
-      id: 6,
-      zone: "Main Zone",
-      startedAt: "14:32:08",
-      peak: 12,
-      capacity: 10,
-      active: true,
-      keyframe: null,
-    },
-    {
-      id: 5,
-      zone: "Main Zone",
-      startedAt: "14:24:51",
-      peak: 13,
-      capacity: 10,
-      active: false,
-      keyframe: null,
-    },
-    {
-      id: 4,
-      zone: "Main Zone",
-      startedAt: "14:16:02",
-      peak: 11,
-      capacity: 10,
-      active: false,
-      keyframe: null,
-    },
-    {
-      id: 3,
-      zone: "Entrance",
-      startedAt: "14:07:44",
-      peak: 9,
-      capacity: 8,
-      active: false,
-      keyframe: null,
-    },
-    {
-      id: 2,
-      zone: "Main Zone",
-      startedAt: "13:58:20",
-      peak: 14,
-      capacity: 10,
-      active: false,
-      keyframe: null,
-    },
-    {
-      id: 1,
-      zone: "Entrance",
-      startedAt: "13:49:05",
-      peak: 8,
-      capacity: 8,
-      active: false,
-      keyframe: null,
-    },
-  ],
-
-  chart: buildHeadcountSeries(),
-  // A flat capacity reference line at 10, so "above the line" means "over capacity".
-  chartCapacity: 10,
-};
-
-/* ---------------------------------------------------------------------------
- * 2. Small helpers
- * ------------------------------------------------------------------------- */
+/** Fetch timeouts. A hung request must not leave a panel on a skeleton forever. */
+const FETCH_TIMEOUT_MS = 8000;
 
 /** Radius of the gauge ring in SVG units; the stroke math below depends on it. */
 const GAUGE_RADIUS = 52;
 /** Circumference of that ring: 2 * PI * 52 ≈ 326.73 SVG units. */
 const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
+/** Colour per status, used for the gauge arc and the chart line of each zone. */
+const STATUS_STROKE = { OK: "var(--ok)", NEAR: "var(--warn)", OVER: "var(--crit)" };
+const ZONE_COLORS = ["#38bdf8", "#a78bfa", "#f472b6", "#34d399"];
+
+/**
+ * The dashboard's memory. Everything the screen needs that is not already in the DOM.
+ *
+ * Why one object instead of scattered variables: the WebSocket handler and the fetch handlers
+ * both write here, and a single object makes it obvious what is shared between them.
+ */
+const app = {
+  // Zone identity and capacity, from /api/zones: [{ name, capacity }]
+  zoneDefs: [],
+  // Per-zone stat lookup by name, filled from each snapshot: name -> snapshot zone
+  latestZones: new Map(),
+  // The alert rows currently on screen, newest first, in the API's shape
+  alerts: [],
+  // The chart series. Kept here rather than in Chart.js so a source switch can clear both.
+  chart: { labels: [], total: [], perZone: {} },
+  // Chart.js instance, so updates replace data instead of leaking a canvas context each time.
+  chartInstance: null,
+  // Current overlay flags: these become the /video query string.
+  overlays: { boxes: true, zones: true, heat: false },
+  // Whether the video element has been pointed at the stream yet.
+  videoAttached: false,
+  // Counts stream requests, so each one gets a distinct cache-busting value.
+  videoRequest: 0,
+  // WebSocket and reconnect bookkeeping.
+  socket: null,
+  reconnectDelay: RECONNECT_MIN_MS,
+  reconnectTimer: null,
+  // True once a socket has opened, so a later retry is shown as Reconnecting, not Connecting.
+  hasConnected: false,
+  // Set while a source switch is in progress, so snapshots do not repopulate a cleared chart.
+  switching: false,
+  // The clip the engine last reported playing, so a change can be detected from /ws alone.
+  source: "",
+  // The most recent snapshot, kept so the KPI row can be repainted after the fetches finish.
+  lastSnapshot: null,
+  // In-flight KPI animations, key -> { frame, timer }, so a new value can cancel the old one.
+  kpiAnim: new Map(),
+};
+
+/* ---------------------------------------------------------------------------
+ * 2. Small helpers
+ * ------------------------------------------------------------------------- */
+
 /**
  * Escapes text before it goes into an HTML template.
  *
- * Why: zone names come from zones.json, which a person edits by hand. A name containing "<" would
- * otherwise break the markup, and in the next step this text arrives over the network.
+ * Why: zone names come from zones.json, which a person edits by hand, and alert rows now come
+ * from the network. A name containing "<" would otherwise inject markup into the page.
+ *
+ * Example: `Main & Co` becomes `Main &amp; Co`.
  *
  * @param {string} value - raw text.
  * @returns {string} the same text with HTML-significant characters replaced.
@@ -186,8 +118,10 @@ function escapeHtml(value) {
 /**
  * Maps a status word to the CSS class used by the chip and the gauge.
  *
+ * Example: "OVER" -> "over", which matches .status-chip.over.
+ *
  * @param {string} status - "OK", "NEAR" or "OVER".
- * @returns {string} "ok", "near" or "over".
+ * @returns {string} the lowercase class name.
  */
 function statusClass(status) {
   return String(status || "OK").toLowerCase();
@@ -196,7 +130,7 @@ function statusClass(status) {
 /**
  * Returns a status-appropriate inline SVG icon.
  *
- * Why inline SVG: the brief forbids an icon library, and a 3-line path is smaller than the
+ * Why inline SVG: the brief forbids an icon library, and a three-line path is smaller than the
  * request that would fetch an icon font.
  *
  * @param {string} status - "OK", "NEAR" or "OVER".
@@ -204,18 +138,15 @@ function statusClass(status) {
  */
 function statusIcon(status) {
   if (status === "OVER") {
-    // A filled circle with an exclamation: "stop, something is wrong".
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
       stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle>
       <path d="M12 7v6"></path><path d="M12 17h.01"></path></svg>`;
   }
   if (status === "NEAR") {
-    // A triangle warning: "watch this".
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 3 2 20h20L12 3z"></path><path d="M12 9v4"></path></svg>`;
   }
-  // A tick: "fine".
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8"
     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M20 6 9 17l-5-5"></path></svg>`;
@@ -224,7 +155,7 @@ function statusIcon(status) {
 /**
  * Formats seconds as a compact dwell string.
  *
- * Example: 18.4 -> "18.4 s"; 47.0 -> "47 s".
+ * Example: 18.4 -> "18 s"; 6.2 -> "6.2 s".
  *
  * @param {number} seconds - dwell time in seconds.
  * @returns {string} the formatted value with its unit.
@@ -234,128 +165,456 @@ function formatDwell(seconds) {
   return value >= 10 ? `${Math.round(value)} s` : `${value.toFixed(1)} s`;
 }
 
+/**
+ * Turns video seconds into an mm:ss label for the chart's x axis.
+ *
+ * Why video time and not the wall clock: the chart must line up with what is on screen. At
+ * video second 31.5 the spike in the line is the crowd you can see in the frame.
+ *
+ * Example: 31.5 -> "00:31"; 125.0 -> "02:05".
+ *
+ * @param {number} seconds - video time in seconds.
+ * @returns {string} the mm:ss label.
+ */
+function videoLabel(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const minutes = String(Math.floor(total / 60)).padStart(2, "0");
+  const secs = String(total % 60).padStart(2, "0");
+  return `${minutes}:${secs}`;
+}
+
+/**
+ * Turns an ISO-8601 timestamp into a short local time for the alert log.
+ *
+ * Why: the API stores UTC (`2026-11-10T09:03:21+00:00`) but an operator reads a wall clock.
+ * Anything unparseable is passed through unchanged rather than showing "Invalid Date".
+ *
+ * Example: "2026-11-10T09:03:21+00:00" -> "14:33:21" in India (UTC+5:30).
+ *
+ * @param {string} iso - the stored timestamp.
+ * @returns {string} HH:MM:SS in local time.
+ */
+function clockTime(iso) {
+  const moment = new Date(iso);
+  if (Number.isNaN(moment.getTime())) {
+    return String(iso || "").slice(11, 19) || "—";
+  }
+  return moment.toLocaleTimeString("en-GB", { hour12: false });
+}
+
+/**
+ * Chooses a stable colour for a zone by its position in the zone list.
+ *
+ * Why stable: a zone keeps its colour for the whole session, so the legend and the line always
+ * refer to the same thing.
+ *
+ * @param {number} index - position in app.zoneDefs.
+ * @returns {string} a hex colour.
+ */
+function zoneColor(index) {
+  return ZONE_COLORS[index % ZONE_COLORS.length];
+}
+
 /* ---------------------------------------------------------------------------
- * 3. Renderers
+ * 3. Fetching, with a visible error state
  * ------------------------------------------------------------------------- */
 
 /**
- * Writes the four KPI cards.
+ * Fetches JSON with a timeout and a single, friendly error path.
  *
- * Why this is its own function: the KPI row is the first thing anyone reads, and it is the most
- * likely place for a "500" or "NaN" to appear if a field is missing. One function means one place
- * to fix it.
+ * Why one wrapper: the brief requires every fetch to be wrapped in try/catch, and doing that
+ * five times invites four slightly different behaviours. One function means one message style,
+ * one timeout, and one place to fix a mistake.
  *
- * @param {object} data - a snapshot-shaped object (see the SAMPLE shape above).
+ * Example: getJson("/api/zones") resolves to an array; a 500 rejects with "Server said 500".
+ *
+ * @param {string} url - an absolute path on this server.
+ * @returns {Promise<any>} the parsed JSON body.
  */
-function renderKpis(data) {
-  const totalPeople = data.zones.reduce((sum, zone) => sum + zone.count, 0);
-  const dwellValues = data.zones.map((zone) => zone.avgDwell);
-  // The headline dwell is the busiest zone's, not the mean of the means: a quiet zone would
-  // otherwise drag the number down and hide a real bottleneck.
-  const busiest = data.zones.reduce(
-    (worst, zone) => (zone.avgDwell > worst.avgDwell ? zone : worst),
-    { avgDwell: 0, name: "—" },
-  );
-
-  setKpi("people", String(totalPeople), `${data.zones.length} zones monitored`);
-  setKpi("peak", String(data.peakPeople), "highest frame this session");
-  setKpi("dwell", formatDwell(busiest.avgDwell), `longest in ${busiest.name}`);
-  setKpi("fps", data.fps.toFixed(1), "detections per second");
-
-  // The header chip mirrors the KPI so the two can never disagree.
-  document.getElementById("fps-chip").textContent = data.fps.toFixed(1);
+async function getJson(url) {
+  // AbortSignal.timeout stops a hung socket from keeping the skeleton up forever.
+  const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!response.ok) {
+    throw new Error(`Server said ${response.status} for ${url}`);
+  }
+  return response.json();
 }
 
 /**
- * Writes one KPI card's number and caption.
+ * Shows the inline error bar with a plain-English message.
+ *
+ * Why never window.alert: it blocks the page, including the video element, and cannot be styled
+ * or dismissed politely. An inline bar keeps the dashboard usable while the message is read.
+ *
+ * @param {string} message - what went wrong, in the user's terms.
+ * @param {Function|null} onRetry - called if the user presses Retry, or null to hide the button.
+ */
+function showError(message, onRetry = null) {
+  const bar = document.getElementById("error-bar");
+  document.getElementById("error-text").textContent = message;
+  const retry = document.getElementById("error-retry");
+  // Hiding rather than removing keeps the markup static and the handler simple.
+  retry.hidden = !onRetry;
+  retry.onclick = onRetry || null;
+  bar.hidden = false;
+}
+
+/** Hides the inline error bar. Why a function: three call sites clear it. */
+function clearError() {
+  document.getElementById("error-bar").hidden = true;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. KPI row
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Animated number writer for the KPI cards.
+ *
+ * Why animate at all: the WebSocket delivers a value twice a second, and a number that jumps
+ * 8 -> 12 -> 9 -> 14 is hard to follow. A 300 ms count-up makes the direction of change visible.
+ *
+ * Why requestAnimationFrame and not setInterval: the browser aligns the frames with its own
+ * paint, so the animation costs nothing when the tab is in the background.
+ *
+ * Why a setTimeout fallback: browsers stop firing requestAnimationFrame for a hidden tab. Without
+ * a fallback the number would freeze halfway (say "7.3 s" forever) because the frames that would
+ * have finished the animation never arrive. The timer always lands on the true value, so the
+ * screen is correct even when the animation is skipped.
  *
  * @param {string} key - "people", "peak", "dwell" or "fps".
- * @param {string} value - already-formatted number text.
- * @param {string} caption - the small grey line under the label.
+ * @param {number} target - the value to land on.
+ * @param {string} [unit] - a small trailing unit, e.g. "s"; omit for none.
  */
-function setKpi(key, value, caption) {
-  const valueNode = document.querySelector(`[data-kpi="${key}"]`);
-  const captionNode = document.querySelector(`[data-kpi-caption="${key}"]`);
-  if (valueNode) {
-    // For dwell and fps the unit is rendered smaller, so it is appended as its own span.
-    if (key === "dwell") {
-      const parts = value.split(" ");
-      valueNode.innerHTML =
-        `${escapeHtml(parts[0])}<span class="unit">${escapeHtml(parts[1] || "")}</span>`;
-    } else {
-      valueNode.textContent = value;
+function animateKpi(key, target, unit = "") {
+  const node = document.querySelector(`[data-kpi="${key}"]`);
+  if (!node) {
+    return;
+  }
+
+  // Read the number currently on screen so a new message animates from where the eye left off.
+  const from = Number(node.dataset.value || 0);
+  const to = Number(target) || 0;
+  node.dataset.value = String(to);
+
+  // A text-only suffix is rendered smaller. Rebuilding it once per animation is cheaper than
+  // tracking it separately, and it keeps the unit in the same place as the digits.
+  const render = (value) => {
+    const text = key === "dwell" ? value.toFixed(1) : String(Math.round(value));
+    node.innerHTML = unit ? `${escapeHtml(text)}<span class="unit">${escapeHtml(unit)}</span>`
+      : escapeHtml(text);
+  };
+
+  // A newer message supersedes the animation still running for this card.
+  const running = app.kpiAnim.get(key);
+  if (running) {
+    cancelAnimationFrame(running.frame);
+    clearTimeout(running.timer);
+  }
+
+  const reducedMotion = window.matchMedia
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // No change, no animation support, or the user asked for less motion: write and stop.
+  if (from === to || typeof requestAnimationFrame !== "function" || reducedMotion) {
+    render(to);
+    app.kpiAnim.delete(key);
+    return;
+  }
+
+  const started = performance.now();
+  const step = (now) => {
+    const progress = Math.min((now - started) / KPI_ANIM_MS, 1);
+    // easeOutCubic: fast at the start, settling at the end, which reads as "arriving".
+    const eased = 1 - (1 - progress) ** 3;
+    if (progress < 1) {
+      render(from + (to - from) * eased);
+      const handle = app.kpiAnim.get(key);
+      if (handle) {
+        handle.frame = requestAnimationFrame(step);
+      }
+      return;
     }
-  }
-  if (captionNode) {
-    captionNode.textContent = caption;
-  }
+    render(to);
+    const handle = app.kpiAnim.get(key);
+    if (handle) {
+      clearTimeout(handle.timer);
+    }
+    app.kpiAnim.delete(key);
+  };
+
+  // The guarantee: whatever happens to the frames, the card shows the true value within a
+  // fraction of a second of the animation window.
+  const timer = setTimeout(() => {
+    render(to);
+    app.kpiAnim.delete(key);
+  }, KPI_ANIM_MS + 60);
+
+  app.kpiAnim.set(key, { frame: requestAnimationFrame(step), timer });
 }
 
 /**
- * Draws one SVG ring gauge per zone.
+ * Writes the four KPI cards and the header FPS chip from one snapshot.
  *
- * Why SVG and not a canvas or a progress bar: a ring shows "how full" and "how much room is left"
- * at the same time, reads well at 90 px, and needs no library. The fill is one circle whose
- * stroke-dashoffset is shortened; see docs/explained/ui.md for the arithmetic.
+ * Why this is its own function: the KPI row is the first thing anyone reads, and it is the most
+ * likely place for a "NaN" to appear if a field is missing. One function means one place to fix.
  *
- * @param {object[]} zones - [{ name, count, capacity, status, avgDwell }]
+ * @param {object} snapshot - one message from /ws.
  */
-function renderGauges(zones) {
-  const container = document.getElementById("zone-gauges");
+function renderKpis(snapshot) {
+  const zones = snapshot.zones || [];
+  const total = Number(snapshot.total_people) || 0;
 
-  container.innerHTML = zones
-    .map((zone) => {
+  // The headline dwell is the busiest zone's, not the mean of the means: a quiet zone would
+  // otherwise drag the number down and hide a real bottleneck.
+  const busiest = zones.reduce(
+    (worst, zone) => ((zone.avg_dwell || 0) > (worst.avg_dwell || 0) ? zone : worst),
+    { avg_dwell: 0, name: "—" },
+  );
+
+  animateKpi("people", total);
+  animateKpi("peak", Number(snapshot.peak_people) || 0);
+  animateKpi("dwell", Number(busiest.avg_dwell) || 0, "s");
+  animateKpi("fps", Number(snapshot.fps) || 0);
+
+  document.querySelector('[data-kpi-caption="people"]').textContent =
+    `${zones.length} zone${zones.length === 1 ? "" : "s"} monitored`;
+  document.querySelector('[data-kpi-caption="dwell"]').textContent =
+    busiest.name === "—" ? "no data yet" : `longest in ${busiest.name}`;
+
+  // The header chip mirrors the KPI so the two can never disagree.
+  document.getElementById("fps-chip").textContent = (Number(snapshot.fps) || 0).toFixed(1);
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. Zone gauges
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Draws one SVG ring per zone and returns the markup as a string.
+ *
+ * Why a string builder separate from the DOM write: update() calls this twice a second. Building
+ * the markup and assigning it once keeps the gauge structure identical between frames, so the
+ * CSS transition on stroke-dashoffset animates instead of restarting from nothing.
+ *
+ * @param {Map<string, object>} latest - zone name -> the newest snapshot zone.
+ * @returns {string} the inner HTML for #zone-gauges.
+ */
+function gaugeMarkup(latest) {
+  return app.zoneDefs
+    .map((definition) => {
+      // A zone with no snapshot yet (the first 0.5 s, or a clip that just changed) reads 0/…
+      const live = latest.get(definition.name) || { count: 0, over_for: 0, avg_dwell: 0 };
+      const count = Number(live.count) || 0;
+      const capacity = Number(definition.capacity) || 0;
+      const status = live.status || deriveStatus(count, capacity);
+
+      // The snapshot's own fill ratio is preferred, because it is computed next to the status and
+      // the two can never disagree. count/capacity is the fallback for the first half second.
+      const rawFill = Number.isFinite(Number(live.fill)) && live.fill !== undefined
+        ? Number(live.fill)
+        : (capacity > 0 ? count / capacity : 0);
       // Clip at 1: an over-capacity zone cannot fill more than a full ring, and the OVER chip
-      // already says the rest. Without the clip the dashoffset would go negative and the arc
-      // would wrap around from the start again, which looks like an empty ring.
-      const fraction = zone.capacity > 0 ? Math.min(zone.count / zone.capacity, 1) : 0;
-      // dashoffset = the part of the circumference that stays hidden.
+      // already says the rest. Without the clip the dashoffset goes negative and the arc wraps
+      // around from the start, which looks like an empty ring.
+      const fraction = Math.min(Math.max(rawFill, 0), 1);
       const offset = GAUGE_CIRCUMFERENCE * (1 - fraction);
-      const status = zone.status || "OK";
       const isHot = status === "OVER" ? " is-hot" : "";
 
       return `
         <div class="gauge-card${isHot}">
           <svg class="gauge" viewBox="0 0 120 120" role="img"
-               aria-label="${escapeHtml(zone.name)}: ${zone.count} of ${zone.capacity} people, ${status}">
+               aria-label="${escapeHtml(definition.name)}: ${count} of ${capacity} people, ${status}">
             <!-- Rotate -90 deg so the ring starts at 12 o'clock instead of 3 o'clock. -->
             <g transform="rotate(-90 60 60)">
               <circle class="gauge-track" cx="60" cy="60" r="${GAUGE_RADIUS}"
                       fill="none" stroke-width="9"></circle>
               <circle class="gauge-arc" cx="60" cy="60" r="${GAUGE_RADIUS}"
                       fill="none" stroke-width="9"
-                      stroke="${status === "OVER" ? "var(--crit)" : status === "NEAR" ? "var(--warn)" : "var(--ok)"}"
+                      stroke="${STATUS_STROKE[status] || STATUS_STROKE.OK}"
                       stroke-dasharray="${GAUGE_CIRCUMFERENCE.toFixed(2)}"
                       stroke-dashoffset="${offset.toFixed(2)}"></circle>
             </g>
-            <text class="gauge-num" x="60" y="58" text-anchor="middle">${zone.count}</text>
-            <text class="gauge-cap" x="60" y="76" text-anchor="middle">/ ${zone.capacity}</text>
+            <text class="gauge-num" x="60" y="58" text-anchor="middle">${count}</text>
+            <text class="gauge-cap" x="60" y="76" text-anchor="middle">/ ${capacity}</text>
           </svg>
-          <div class="gauge-name" title="${escapeHtml(zone.name)}">${escapeHtml(zone.name)}</div>
+          <div class="gauge-name" title="${escapeHtml(definition.name)}">
+            ${escapeHtml(definition.name)}
+          </div>
           <span class="status-chip ${statusClass(status)}">
             ${statusIcon(status)}${escapeHtml(status)}
           </span>
-          <div class="gauge-dwell">avg ${formatDwell(zone.avgDwell)}</div>
+          <div class="gauge-dwell">avg ${formatDwell(live.avg_dwell)}</div>
         </div>`;
     })
     .join("");
-
-  // Summary chip: how many zones are over, which is the single number worth reading at a glance.
-  const overCount = zones.filter((zone) => zone.status === "OVER").length;
-  const summary = document.getElementById("zones-summary");
-  summary.textContent = overCount > 0 ? `${overCount}/${zones.length} over` : "all normal";
-  summary.style.color = overCount > 0 ? "var(--crit)" : "var(--ok)";
 }
 
 /**
- * Draws the alert log, or the empty state when there is nothing to show.
+ * Mirrors app/zones.py status_for, for the half second before a snapshot names a status.
+ *
+ * Why duplicate the rule: the gauges must render before the first message arrives, and the
+ * capacity is already known. Keeping the thresholds identical means the placeholder and the
+ * live state can never disagree.
+ *
+ * Example with capacity 10: 7 -> OK, 8 -> NEAR, 10 -> NEAR, 11 -> OVER.
+ *
+ * @param {number} count - people in the zone.
+ * @param {number} capacity - the zone's capacity.
+ * @returns {string} "OK", "NEAR" or "OVER".
+ */
+function deriveStatus(count, capacity) {
+  if (capacity > 0 && count > capacity) {
+    return "OVER";
+  }
+  // 0.8 is config.NEAR_RATIO on the server; see docs/explained/live.md for why it is repeated.
+  if (capacity > 0 && count >= 0.8 * capacity) {
+    return "NEAR";
+  }
+  return "OK";
+}
+
+/**
+ * Writes the gauges and the summary chip into the page.
+ *
+ * @param {Map<string, object>} latest - zone name -> the newest snapshot zone.
+ */
+function renderGauges(latest) {
+  const container = document.getElementById("zone-gauges");
+  const summary = document.getElementById("zones-summary");
+
+  if (!app.zoneDefs.length) {
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path>
+          <path d="M12 16h.01"></path>
+        </svg>
+        <span>No zones for this clip.</span>
+      </div>`;
+    summary.textContent = "none";
+    summary.style.color = "var(--muted)";
+    return;
+  }
+
+  container.innerHTML = gaugeMarkup(latest);
+
+  // Summary chip: how many zones are over, which is the single number worth reading at a glance.
+  const overCount = app.zoneDefs.filter((definition) => {
+    const live = latest.get(definition.name);
+    const status = live && live.status
+      ? live.status
+      : deriveStatus(live ? live.count : 0, definition.capacity);
+    return status === "OVER";
+  }).length;
+  summary.textContent = overCount > 0 ? `${overCount}/${app.zoneDefs.length} over` : "all normal";
+  summary.style.color = overCount > 0 ? "var(--crit)" : "var(--ok)";
+}
+
+/* ---------------------------------------------------------------------------
+ * 6. Alert log
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Normalises one alert from the API or from a snapshot into the row shape the renderer wants.
+ *
+ * Why normalise: GET /api/alerts returns database columns (`started_at`, `peak_count`, `ended_at`)
+ * while a new alert on the socket is `{ id, zone, keyframe }`. One function turns both into
+ * `{ id, zone, startedAt, peak, capacity, active, keyframe }`, so the renderer never branches.
+ *
+ * Example: { peak_count: 8, capacity: 4, ended_at: null } -> { peak: 8, capacity: 4, active: true }.
+ *
+ * @param {object} raw - an alert in either shape.
+ * @returns {object} the row shape.
+ */
+function normaliseAlert(raw) {
+  return {
+    id: Number(raw.id) || 0,
+    zone: String(raw.zone || "Unknown"),
+    startedAt: clockTime(raw.startedAt || raw.started_at),
+    peak: Number(raw.peak ?? raw.peak_count) || 0,
+    capacity: Number(raw.capacity) || 0,
+    // An alert is active while it has no ended_at. A socket alert is brand new, so also active.
+    active: raw.active !== undefined ? Boolean(raw.active) : !raw.ended_at,
+    keyframe: raw.keyframe || null,
+  };
+}
+
+/**
+ * Builds one alert row's markup.
+ *
+ * @param {object} alert - a normalised alert.
+ * @param {boolean} isNew - true to add the flash class.
+ * @returns {string} the <li> markup.
+ */
+function alertRowMarkup(alert, isNew) {
+  // Severity is derived, not stored: a peak far above capacity is critical, a marginal
+  // overshoot is a warning. Deriving it keeps one source of truth for the colour.
+  const ratio = alert.capacity > 0 ? alert.peak / alert.capacity : 0;
+  const severity = alert.active ? "crit" : ratio >= 1.3 ? "crit" : "warn";
+  const tagClass = alert.active ? "active" : "cleared";
+  const tagText = alert.active ? "Active" : "Cleared";
+
+  // A real thumbnail when there is a keyframe, a placeholder frame otherwise. Only a real photo
+  // becomes a button: opening a modal on an empty placeholder would waste the click.
+  const thumb = alert.keyframe
+    ? `<button type="button" class="alert-thumb is-clickable" data-alert-id="${alert.id}"
+              data-keyframe="${escapeHtml(alert.keyframe)}"
+              aria-label="Open evidence for ${escapeHtml(alert.zone)}">
+         <img src="${escapeHtml(alert.keyframe)}" alt="">
+       </button>`
+    : `<span class="alert-thumb">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+           <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+           <circle cx="9" cy="10" r="1.6"></circle>
+           <path d="m4 18 5-5 4 4 3-3 4 4"></path>
+         </svg>
+       </span>`;
+
+  return `
+    <li class="alert-row${alert.active ? " is-active" : ""}${isNew ? " is-new" : ""}"
+        data-alert-id="${alert.id}">
+      <span class="alert-sev ${severity}" aria-hidden="true"></span>
+      ${thumb}
+      <span class="alert-main">
+        <span class="alert-top">
+          <span class="alert-time">${escapeHtml(alert.startedAt)}</span>
+          <span class="alert-zone">${escapeHtml(alert.zone)}</span>
+        </span>
+        <span class="alert-meta">peak ${alert.peak}/${alert.capacity}</span>
+      </span>
+      <span class="alert-tag ${tagClass}">${tagText}</span>
+    </li>`;
+}
+
+/**
+ * Sets the browser tab's title to the active alert count.
+ *
+ * Why the tab title: an operator may have the dashboard in a background tab while working
+ * elsewhere, and the count in the title is the only signal that reaches them there.
+ *
+ * Example: 1 active -> "(1) Crowd Analytics"; 0 active -> the plain product name.
+ *
+ * @param {number} activeCount - alerts currently firing.
+ */
+function updateTitle(activeCount) {
+  document.title = activeCount > 0
+    ? `(${activeCount}) Crowd Analytics`
+    : "Crowd Analytics — Density & Bottleneck Monitor";
+}
+
+/**
+ * Writes the alert log, or the empty state when there is nothing to show.
  *
  * Why the empty state matters: an empty list looks identical to a broken panel. "No alerts. All
  * zones normal." tells the operator the difference in three words.
  *
- * @param {object[]} alerts - newest first, as produced by the backend.
+ * @param {object[]} alerts - normalised alerts, newest first.
+ * @param {number} newId - the id to flash, or 0 for none.
  */
-function renderAlerts(alerts) {
+function renderAlerts(alerts, newId = 0) {
   const list = document.getElementById("alert-list");
   const summary = document.getElementById("alerts-summary");
 
@@ -370,62 +629,61 @@ function renderAlerts(alerts) {
       </li>`;
     summary.textContent = "0";
     summary.style.color = "var(--ok)";
+    // The title must be reset here too: an empty list is the most common way to go back to zero,
+    // and leaving "(1)" in the tab would be a lie that outlives the alert.
+    updateTitle(0);
     return;
   }
 
-  list.innerHTML = alerts
-    .map((alert) => {
-      // Severity is derived, not stored: a peak far above capacity is critical, a marginal
-      // overshoot is a warning. Deriving it keeps one source of truth for the colour.
-      const ratio = alert.capacity > 0 ? alert.peak / alert.capacity : 0;
-      const severity = alert.active ? "crit" : ratio >= 1.3 ? "crit" : "warn";
-      const tagClass = alert.active ? "active" : "cleared";
-      const tagText = alert.active ? "Active" : "Cleared";
-
-      // A real thumbnail when the backend supplies a keyframe, a placeholder frame otherwise.
-      const thumb = alert.keyframe
-        ? `<img src="${escapeHtml(alert.keyframe)}" alt="Evidence for ${escapeHtml(alert.zone)}">`
-        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-             <rect x="3" y="4" width="18" height="16" rx="2"></rect>
-             <circle cx="9" cy="10" r="1.6"></circle>
-             <path d="m4 18 5-5 4 4 3-3 4 4"></path>
-           </svg>`;
-
-      return `
-        <li class="alert-row${alert.active ? " is-active" : ""}">
-          <span class="alert-sev ${severity}" aria-hidden="true"></span>
-          <span class="alert-thumb">${thumb}</span>
-          <span class="alert-main">
-            <span class="alert-top">
-              <span class="alert-time">${escapeHtml(alert.startedAt)}</span>
-              <span class="alert-zone">${escapeHtml(alert.zone)}</span>
-            </span>
-            <span class="alert-meta">peak ${alert.peak}/${alert.capacity}</span>
-          </span>
-          <span class="alert-tag ${tagClass}">${tagText}</span>
-        </li>`;
-    })
-    .join("");
+  list.innerHTML = alerts.map((alert) => alertRowMarkup(alert, alert.id === newId)).join("");
 
   const activeCount = alerts.filter((alert) => alert.active).length;
   summary.textContent = `${activeCount} active / ${alerts.length}`;
   summary.style.color = activeCount > 0 ? "var(--crit)" : "var(--muted)";
+  updateTitle(activeCount);
 }
 
-/** Holds the Chart.js instance so a re-render updates it instead of stacking a second canvas. */
-let headcountChart = null;
+/**
+ * Adds one brand-new alert at the top of the log and flashes it.
+ *
+ * Why not just re-render everything: a full re-render would reset the scroll position and the
+ * flash would land on every row at once. Prepending one <li> keeps the rest of the list still.
+ *
+ * @param {object} rawAlert - { id, zone, keyframe } from the snapshot.
+ * @param {object} [context] - optional { count, capacity } from the snapshot for the first paint.
+ */
+function prependAlert(rawAlert, context = {}) {
+  const alert = normaliseAlert({
+    ...rawAlert,
+    peak: context.count ?? rawAlert.peak,
+    capacity: context.capacity ?? rawAlert.capacity,
+    active: true,
+  });
+
+  // A duplicate id would mean the same alert counted twice; ignore it.
+  if (app.alerts.some((existing) => existing.id === alert.id)) {
+    return;
+  }
+
+  app.alerts.unshift(alert);
+  // The log shows the newest 50; anything past that is still in the database.
+  app.alerts = app.alerts.slice(0, 50);
+  renderAlerts(app.alerts, alert.id);
+}
+
+/* ---------------------------------------------------------------------------
+ * 7. Chart
+ * ------------------------------------------------------------------------- */
 
 /**
- * Draws the headcount line with a flat capacity reference line.
+ * Creates the Chart.js instance once, with one dataset per zone plus the total and capacity.
  *
- * Why update instead of recreate: Chart.js keeps a canvas context. Calling new Chart() repeatedly
- * on the same canvas leaks instances and eventually freezes the tab during a long demo.
+ * Why build the datasets from app.zoneDefs: the number of zones comes from /api/zones, so the
+ * chart cannot hard-code "two lines" for a clip that defines three.
  *
- * @param {{labels: string[], values: number[]}} series - the samples to plot.
- * @param {number} capacity - the flat capacity line.
+ * @returns {object} the Chart instance.
  */
-function renderChart(series, capacity) {
+function createChart() {
   const canvas = document.getElementById("headcount-chart");
   const context = canvas.getContext("2d");
 
@@ -434,29 +692,40 @@ function renderChart(series, capacity) {
   gradient.addColorStop(0, "rgba(56, 189, 248, 0.34)");
   gradient.addColorStop(1, "rgba(56, 189, 248, 0.02)");
 
-  const capacityLine = series.values.map(() => capacity);
+  const zoneDatasets = app.zoneDefs.map((definition, index) => ({
+    label: definition.name,
+    data: [],
+    borderColor: zoneColor(index),
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    fill: false,
+    tension: 0.35,
+    pointRadius: 0,
+    pointHoverRadius: 3,
+  }));
 
   const config = {
     type: "line",
     data: {
-      labels: series.labels,
+      labels: [],
       datasets: [
         {
-          label: "People",
-          data: series.values,
+          label: "Total",
+          data: [],
           borderColor: "#38bdf8",
           backgroundColor: gradient,
           borderWidth: 2,
           fill: true,
           tension: 0.35,
-          // No dots: 60 of them would look like a scatter plot, not a trend.
+          // No dots: 120 of them would look like a scatter plot, not a trend.
           pointRadius: 0,
           pointHoverRadius: 4,
           pointHoverBackgroundColor: "#38bdf8",
         },
+        ...zoneDatasets,
         {
           label: "Capacity",
-          data: capacityLine,
+          data: [],
           borderColor: "#ef4444",
           borderWidth: 1.5,
           borderDash: [5, 4],
@@ -478,7 +747,6 @@ function renderChart(series, capacity) {
           ticks: {
             color: "#8fa3bf",
             font: { size: 10 },
-            // Show every 12th label so 60 timestamps do not overlap into a grey smear.
             maxTicksLimit: 6,
             maxRotation: 0,
           },
@@ -493,28 +761,180 @@ function renderChart(series, capacity) {
     },
   };
 
-  if (headcountChart) {
-    headcountChart.data = config.data;
-    headcountChart.update("none");
+  return new Chart(context, config);
+}
+
+/**
+ * Pushes the current series in app.chart into the Chart.js instance.
+ *
+ * Why update("none"): the brief asks for it, and it is right - the chart repaints without an
+ * animation, so a point arriving every half second does not produce an endless 300 ms ease that
+ * the data keeps outrunning.
+ */
+function pushChartData() {
+  const chart = app.chartInstance;
+  if (!chart) {
     return;
   }
-  headcountChart = new Chart(context, config);
+
+  chart.data.labels = app.chart.labels;
+  chart.data.datasets[0].data = app.chart.total;
+  app.zoneDefs.forEach((definition, index) => {
+    // Dataset 0 is Total and the last one is Capacity, so zone i lives at i + 1.
+    const series = app.chart.perZone[definition.name] || [];
+    chart.data.datasets[index + 1].data = series;
+  });
+
+  // The capacity line follows the busiest zone's capacity, so "above the line" always means
+  // "over capacity" for the zone that is closest to it.
+  const capacity = app.zoneDefs.reduce(
+    (max, definition) => Math.max(max, Number(definition.capacity) || 0),
+    0,
+  );
+  const last = chart.data.datasets.length - 1;
+  chart.data.datasets[last].data = app.chart.labels.map(() => capacity);
+
+  chart.update("none");
+}
+
+/**
+ * Appends one sample to every series, trimming to CHART_MAX_POINTS.
+ *
+ * Why trim from the front: the chart is a moving window. Keeping every point forever would grow
+ * the array for the whole session and slowly make the browser work harder.
+ *
+ * @param {string} label - the mm:ss video time.
+ * @param {number} total - people in frame.
+ * @param {Map<string, object>} latest - zone name -> snapshot zone.
+ */
+function appendChartPoint(label, total, latest) {
+  app.chart.labels.push(label);
+  app.chart.total.push(total);
+  app.zoneDefs.forEach((definition) => {
+    const live = latest.get(definition.name);
+    if (!app.chart.perZone[definition.name]) {
+      app.chart.perZone[definition.name] = [];
+    }
+    app.chart.perZone[definition.name].push(live ? Number(live.count) || 0 : 0);
+  });
+
+  const overflow = app.chart.labels.length - CHART_MAX_POINTS;
+  if (overflow > 0) {
+    app.chart.labels.splice(0, overflow);
+    app.chart.total.splice(0, overflow);
+    Object.values(app.chart.perZone).forEach((series) => series.splice(0, overflow));
+  }
+
+  pushChartData();
+  document.getElementById("chart-window").textContent =
+    `last ${app.chart.labels.length} samples · video time`;
+}
+
+/**
+ * Prefills the chart from GET /api/history.
+ *
+ * Why: a page opened in the middle of a demo should show the last few minutes, not an empty box
+ * that fills up one point every two seconds. The history endpoint stores wall-clock timestamps,
+ * so the labels are derived from them rather than from video time.
+ *
+ * @param {object[]} rows - [{ ts, zone, count }] oldest first, including the "ALL" total rows.
+ */
+function prefillChart(rows) {
+  // One "ALL" row per sample time is the total; the per-zone rows share those timestamps.
+  const byTime = new Map();
+  rows.forEach((row) => {
+    const key = row.ts;
+    if (!byTime.has(key)) {
+      byTime.set(key, { label: clockTime(key).slice(0, 5), total: 0, zones: {} });
+    }
+    const point = byTime.get(key);
+    if (row.zone === "ALL") {
+      point.total = Number(row.count) || 0;
+    } else {
+      point.zones[row.zone] = Number(row.count) || 0;
+    }
+  });
+
+  const times = [...byTime.keys()].slice(-CHART_MAX_POINTS);
+  app.chart = { labels: [], total: [], perZone: {} };
+  app.zoneDefs.forEach((definition) => {
+    app.chart.perZone[definition.name] = [];
+  });
+
+  times.forEach((key) => {
+    const point = byTime.get(key);
+    app.chart.labels.push(point.label);
+    app.chart.total.push(point.total);
+    app.zoneDefs.forEach((definition) => {
+      app.chart.perZone[definition.name].push(point.zones[definition.name] || 0);
+    });
+  });
+
+  pushChartData();
+  document.getElementById("chart-window").textContent =
+    app.chart.labels.length
+      ? `last ${app.chart.labels.length} samples`
+      : "waiting for the first samples";
+}
+
+/**
+ * Rebuilds the chart's datasets, used after the zone list changes with a new clip.
+ *
+ * Why rebuild and not update: a different clip can have a different number of zones, and Chart.js
+ * datasets are created by position. Recreating the instance is the simple, correct option; it
+ * happens once per source switch, not once per message.
+ */
+function rebuildChart() {
+  if (app.chartInstance) {
+    app.chartInstance.destroy();
+    app.chartInstance = null;
+  }
+  app.chartInstance = createChart();
+  paintLegend();
+}
+
+/**
+ * Writes the zone swatches into the HTML legend.
+ *
+ * Why HTML and not Chart.js's legend: the card header already holds the "Total" and "Capacity"
+ * swatches, and one legend in one style is easier to read than two legends.
+ */
+function paintLegend() {
+  const legend = document.getElementById("chart-legend");
+  const fixed = `
+    <span class="inline-flex items-center gap-1.5">
+      <span style="width:14px;height:2px;border-radius:2px;background:var(--accent)"></span>
+      Total
+    </span>`;
+  const zones = app.zoneDefs
+    .map((definition, index) => `
+      <span class="inline-flex items-center gap-1.5">
+        <span style="width:14px;height:2px;border-radius:2px;
+                     background:${zoneColor(index)}"></span>
+        ${escapeHtml(definition.name)}
+      </span>`)
+    .join("");
+  const capacity = `
+    <span class="inline-flex items-center gap-1.5">
+      <span style="width:14px;height:2px;border-radius:2px;
+                   background:repeating-linear-gradient(90deg,var(--crit) 0 4px,transparent 4px 7px)">
+      </span>
+      Capacity
+    </span>`;
+  legend.innerHTML = fixed + zones + capacity;
 }
 
 /* ---------------------------------------------------------------------------
- * 4. Banner, clock, overlays
+ * 8. Banner, video, overlays
  * ------------------------------------------------------------------------- */
 
 /**
- * Shows or hides the congestion banner, and fills in its text.
+ * Shows or hides the congestion banner.
  *
- * Why the text is assembled here rather than in the HTML: the same banner serves any zone, and
- * the count and duration change every second in the live version.
+ * Why the text is assembled here rather than in the HTML: the banner serves any zone, and the
+ * count and duration change twice a second.
  *
- * @param {{name: string, count: number, capacity: number, overFor: number}|null} problem
- *   the worst congested zone, or null to hide the banner. The field is called "name" because
- *   that is what the engine snapshot sends for a zone; keeping the same key now means the live
- *   data can drive this function unchanged in the next step.
+ * @param {object|null} problem - the worst congested zone, or null to hide the banner.
  */
 function renderBanner(problem) {
   const banner = document.getElementById("congestion-banner");
@@ -527,14 +947,14 @@ function renderBanner(problem) {
 
   text.innerHTML =
     `CONGESTION: ${escapeHtml(problem.name)} ${problem.count}/${problem.capacity} ` +
-    `<span class="banner-count">for ${Math.round(problem.overFor || 0)} s</span>`;
+    `<span class="banner-count">for ${Math.round(problem.over_for || 0)} s</span>`;
   banner.hidden = false;
 }
 
 /**
  * Finds the zone that has been over capacity the longest, for the banner.
  *
- * @param {object[]} zones - zones with an optional overFor (seconds).
+ * @param {object[]} zones - snapshot zones with over_for in seconds.
  * @returns {object|null} the worst zone, or null when nothing is over.
  */
 function worstZone(zones) {
@@ -543,44 +963,64 @@ function worstZone(zones) {
     return null;
   }
   return over.reduce((worst, zone) =>
-    (zone.overFor || 0) > (worst.overFor || 0) ? zone : worst,
-  );
+    ((zone.over_for || 0) > (worst.over_for || 0) ? zone : worst));
 }
 
 /**
- * Paints the top-bar clock once and then every second.
+ * Builds the MJPEG URL from the current overlay flags.
  *
- * Why local time and not video time: this is the operator's clock. Video time is a different
- * number and already appears in the KPI row and the alert log.
+ * Why rebuild on every toggle instead of using CSS: the overlays are drawn by OpenCV on the
+ * server, so the flags have to travel in the request. The query string is the whole contract:
+ * 1 turns an overlay on, 0 turns it off.
+ *
+ * Example: { boxes: true, zones: true, heat: false } -> "/video?boxes=1&zones=1&heat=0".
+ *
+ * @returns {string} the stream URL.
  */
-function startClock() {
-  const node = document.getElementById("clock");
-  const tick = () => {
-    node.textContent = new Date().toLocaleTimeString("en-GB", { hour12: false });
-  };
-  tick();
-  setInterval(tick, 1000);
+function videoUrl() {
+  const flags = app.overlays;
+  return `/video?boxes=${flags.boxes ? 1 : 0}` +
+    `&zones=${flags.zones ? 1 : 0}&heat=${flags.heat ? 1 : 0}`;
 }
 
-/** Current overlay state; in the next step this becomes the /video query string. */
-const overlays = { boxes: true, zones: true, heat: false };
+/**
+ * Points the <img> at the stream, or reloads it after a flag change.
+ *
+ * Why a cache-busting parameter: the browser keeps the previous src as the image's current
+ * state, and some browsers reuse it instead of opening a second connection, which would leave
+ * the old overlay on screen. A changing query string guarantees a fresh request.
+ *
+ * Why a counter and not Date.now(): two toggles in the same millisecond would produce the same
+ * URL, and the browser would quietly do nothing. A counter can never repeat.
+ */
+function attachVideo() {
+  const image = document.getElementById("video");
+  app.videoRequest += 1;
+  image.src = `${videoUrl()}&t=${app.videoRequest}`;
+  app.videoAttached = true;
+  document.getElementById("video-idle").hidden = true;
+}
 
 /**
- * Wires one overlay toggle button to the shared state.
+ * Wires the overlay chips: flip one flag, then reload the stream.
  *
  * Why aria-pressed is the only stored truth: the CSS colours the chip from that attribute, so the
  * visual state and what a screen reader announces can never drift apart.
  *
  * @param {string} id - the button's element id.
- * @param {string} key - the key in the overlays object.
+ * @param {string} key - the key in app.overlays.
  */
 function bindToggle(id, key) {
   const button = document.getElementById(id);
   button.addEventListener("click", () => {
-    overlays[key] = !overlays[key];
-    button.setAttribute("aria-pressed", String(overlays[key]));
+    app.overlays[key] = !app.overlays[key];
+    button.setAttribute("aria-pressed", String(app.overlays[key]));
+    // Only reload a stream that is running: before the first attach there is nothing to reload.
+    if (app.videoAttached) {
+      attachVideo();
+    }
   });
-  button.setAttribute("aria-pressed", String(overlays[key]));
+  button.setAttribute("aria-pressed", String(app.overlays[key]));
 }
 
 /**
@@ -601,30 +1041,540 @@ function bindFullscreen() {
 }
 
 /* ---------------------------------------------------------------------------
- * 5. States: skeletons and boot
+ * 9. WebSocket with exponential backoff
  * ------------------------------------------------------------------------- */
 
 /**
- * Replaces the gauges and alert list with shimmering placeholders.
+ * Reflects the connection state in the LIVE pill.
  *
- * Why bother: the real app takes a second or two to load the model, and a blank panel looks
- * broken. A shimmer says "working" without inventing numbers.
+ * Why words and colour together: colour alone fails for a colour-blind operator, and the pill is
+ * the only indication that the numbers on screen are still moving.
+ *
+ * @param {"live"|"reconnecting"|"waiting"} state - the new pill state.
+ */
+function setLiveState(state) {
+  const pill = document.getElementById("live-pill");
+  const label = document.getElementById("live-label");
+  pill.classList.remove("is-live", "is-reconnecting", "is-waiting");
+  pill.classList.add(`is-${state}`);
+  label.textContent = {
+    live: "Connected",
+    reconnecting: "Reconnecting",
+    waiting: "Connecting",
+  }[state] || "Connecting";
+}
+
+/**
+ * Opens the WebSocket and keeps it open.
+ *
+ * Why reconnection lives here and not in a library: a dashboard in front of a panel must survive
+ * the server restarting. The backoff starts at 1 s, doubles on each failure, and stops at 10 s,
+ * so a server that is restarting for 40 s is still picked up within 10 s of coming back.
+ *
+ * Why reset the delay on a successful open and not on the first message: open is the moment the
+ * connection is real; waiting for a message would keep the delay high after a fast recovery.
+ */
+function connectSocket() {
+  // The page may be served over https, where ws:// is blocked; match the page's scheme.
+  const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+  const socket = new WebSocket(`${scheme}://${window.location.host}/ws`);
+  app.socket = socket;
+  // "Connecting" is only honest before the first successful open. After that, a retry is a
+  // reconnection, and showing a third label for half a second just makes the pill flicker.
+  if (!app.hasConnected) {
+    setLiveState("waiting");
+  }
+
+  socket.addEventListener("open", () => {
+    app.reconnectDelay = RECONNECT_MIN_MS;
+    app.hasConnected = true;
+    setLiveState("live");
+    clearError();
+  });
+
+  socket.addEventListener("message", (event) => {
+    try {
+      update(JSON.parse(event.data));
+    } catch (error) {
+      // A malformed message must not kill the socket; the next one is probably fine.
+      console.warn("Bad snapshot", error);
+    }
+  });
+
+  socket.addEventListener("close", () => {
+    setLiveState("reconnecting");
+    scheduleReconnect();
+  });
+
+  // "error" is always followed by "close", so the retry is scheduled in one place only.
+  socket.addEventListener("error", () => {
+    socket.close();
+  });
+}
+
+/**
+ * Waits for the backoff delay, then reconnects.
+ *
+ * Why a timer id: a second close event would otherwise queue a second socket, and two sockets
+ * would double every render.
+ */
+function scheduleReconnect() {
+  if (app.reconnectTimer) {
+    return;
+  }
+  const delay = app.reconnectDelay;
+  document.getElementById("footer-status").textContent =
+    `Connection lost. Retrying in ${Math.round(delay / 1000)} s…`;
+  app.reconnectTimer = setTimeout(() => {
+    app.reconnectTimer = null;
+    // Double for next time, capped. 1 s -> 2 -> 4 -> 8 -> 10 -> 10 ...
+    app.reconnectDelay = Math.min(app.reconnectDelay * 2, RECONNECT_MAX_MS);
+    connectSocket();
+  }, delay);
+}
+
+/* ---------------------------------------------------------------------------
+ * 10. The update path: one snapshot to the whole screen
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Corrects the "Active" tag on rows that the database still thinks are open.
+ *
+ * Why this is needed: an alert row is closed by the engine, but a crashed run leaves rows with
+ * ended_at NULL forever. Marking one of those "Active" while the live banner says nothing is over
+ * is the one thing an operator must not see - it makes both indicators untrustworthy.
+ *
+ * Why the zone's over_for and not its status: over_for is 0.0 exactly when the zone is not
+ * currently over capacity, so it is the engine's own answer to "is this alert still firing?".
+ *
+ * Example: row 21 is open and its zone reports over_for 0 -> the row is shown as Cleared.
+ *
+ * @param {Map<string, object>} latest - zone name -> newest snapshot zone.
+ */
+function reconcileActiveAlerts(latest) {
+  let changed = false;
+  app.alerts = app.alerts.map((alert) => {
+    // Only the newest few can plausibly still be running; the rest are history.
+    if (!alert.active) {
+      return alert;
+    }
+    const zone = latest.get(alert.zone);
+    if (zone && (Number(zone.over_for) || 0) <= 0) {
+      changed = true;
+      return { ...alert, active: false };
+    }
+    return alert;
+  });
+  if (changed) {
+    renderAlerts(app.alerts);
+  }
+}
+
+/**
+ * Applies one WebSocket snapshot to every panel.
+ *
+ * Why one function for the whole screen: if each panel read its own data, the banner could
+ * describe 10.5 s while the chart's last point is 10.0 s. One snapshot, one instant.
+ *
+ * @param {object} snapshot - one message from /ws.
+ */
+function update(snapshot) {
+  // The engine may still be starting; an empty zone list means "nothing to say yet".
+  const zones = Array.isArray(snapshot.zones) ? snapshot.zones : [];
+  app.latestZones = new Map(zones.map((zone) => [zone.name, zone]));
+  app.lastSnapshot = snapshot;
+
+  // An empty zone list means the engine has no clip loaded yet. Rendering it would blank the
+  // gauges and the KPI cards, so wait for a snapshot that carries real zones.
+  if (!zones.length && !app.zoneDefs.length) {
+    document.getElementById("footer-status").textContent = "Engine starting…";
+    return;
+  }
+
+  // A clip change made in another tab arrives through the snapshot alone.
+  if (snapshot.source && app.source && snapshot.source !== app.source && !app.switching) {
+    app.source = snapshot.source;
+    document.getElementById("video-source-chip").textContent = snapshot.source;
+    document.getElementById("source-select").value = snapshot.source;
+  } else if (snapshot.source) {
+    app.source = snapshot.source;
+  }
+
+  renderKpis(snapshot);
+  renderGauges(app.latestZones);
+
+  // The banner is driven by alerts_active, per the brief, and names the worst over-capacity
+  // zone when one exists. A cleared-alert frame hides it even if a zone is still near capacity.
+  if (Number(snapshot.alerts_active) > 0) {
+    renderBanner(worstZone(zones) || (zones.find((zone) => zone.status === "OVER") || null));
+  } else {
+    renderBanner(null);
+  }
+
+  // A source switch clears the chart; do not immediately refill it with the new clip's point
+  // until the re-fetch has happened, or the chart would show one stale point and a gap.
+  if (!app.switching && zones.length) {
+    appendChartPoint(videoLabel(snapshot.ts), Number(snapshot.total_people) || 0,
+      app.latestZones);
+  }
+
+  if (snapshot.new_alert) {
+    const alert = snapshot.new_alert;
+    const zone = zones.find((item) => item.name === alert.zone);
+    prependAlert(alert, {
+      count: zone ? zone.count : alert.count,
+      capacity: zone ? zone.capacity : alert.capacity,
+    });
+    showToast(alert.zone, zone);
+  } else {
+    // Only reconcile when no alert is being added, so the new row's Active tag is never
+    // immediately rewritten by a snapshot taken before the alert fired.
+    reconcileActiveAlerts(app.latestZones);
+  }
+
+  document.getElementById("footer-status").textContent =
+    `Live · ${snapshot.source || "—"} · video ${videoLabel(snapshot.ts)}`;
+}
+
+/* ---------------------------------------------------------------------------
+ * 11. Toast and evidence modal
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Announces a brand-new alert in the corner of the screen.
+ *
+ * Why a toast as well as the log row: the alert log is in the right-hand column, and an operator
+ * watching the video may not look there. The toast is the one element that appears where the eye
+ * already is.
+ *
+ * @param {string} zoneName - the zone that went over capacity.
+ * @param {object} [zone] - the snapshot zone, for the count and capacity.
+ */
+function showToast(zoneName, zone) {
+  const stack = document.getElementById("toast-stack");
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  const detail = zone ? ` ${zone.count}/${zone.capacity} people` : "";
+  toast.innerHTML = `
+    <span class="toast-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" aria-hidden="true">
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <path d="M12 9v4"></path><path d="M12 17h.01"></path>
+      </svg>
+    </span>
+    <span class="toast-body">
+      <span class="toast-title">Over capacity</span>
+      <span class="toast-text">${escapeHtml(zoneName)}${escapeHtml(detail)}</span>
+    </span>`;
+  stack.appendChild(toast);
+
+  // Fade out, then remove. Removing without the fade would make the toast vanish mid-read.
+  setTimeout(() => {
+    toast.classList.add("is-leaving");
+    setTimeout(() => toast.remove(), 220);
+  }, TOAST_MS);
+}
+
+/**
+ * Opens the evidence modal for one alert and loads its keyframe.
+ *
+ * Why the modal exists: the alert row is 38 px tall, and a panel question is usually "what did
+ * the camera actually see?". The full photo is the answer, and it lives one click away.
+ *
+ * @param {object} alert - the normalised alert whose photo to show.
+ */
+function openEvidence(alert) {
+  const modal = document.getElementById("evidence-modal");
+  const image = document.getElementById("evidence-image");
+  const empty = document.getElementById("evidence-empty");
+
+  document.getElementById("evidence-title").textContent =
+    `${alert.zone} · ${alert.startedAt}`;
+  document.getElementById("evidence-meta").textContent =
+    `peak ${alert.peak}/${alert.capacity} · ${alert.active ? "still active" : "cleared"}`;
+
+  if (alert.keyframe) {
+    image.src = alert.keyframe;
+    image.hidden = false;
+    image.alt = `Snapshot of ${alert.zone} at ${alert.startedAt}`;
+    empty.hidden = true;
+  } else {
+    // Dropping the src stops the browser from keeping the previous photo on screen.
+    image.removeAttribute("src");
+    image.hidden = true;
+    empty.hidden = false;
+  }
+
+  modal.showModal();
+}
+
+/**
+ * Wires the alert list's one delegated click handler and the modal's close controls.
+ *
+ * Why delegation: rows are replaced on every new alert, so per-row listeners would be created
+ * and thrown away twice a second. One listener on the parent survives every re-render.
+ */
+function bindAlertList() {
+  document.getElementById("alert-list").addEventListener("click", (event) => {
+    const button = event.target.closest(".alert-thumb.is-clickable");
+    if (!button) {
+      return;
+    }
+    const id = Number(button.dataset.alertId);
+    const alert = app.alerts.find((item) => item.id === id);
+    if (alert) {
+      openEvidence(alert);
+    }
+  });
+
+  const modal = document.getElementById("evidence-modal");
+  document.getElementById("evidence-close").addEventListener("click", () => modal.close());
+  // A click on the backdrop lands on the <dialog> itself, which is the natural "click outside".
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      modal.close();
+    }
+  });
+}
+
+/* ---------------------------------------------------------------------------
+ * 12. Source switching
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Switches the engine to another clip, then rebuilds everything that depends on the clip.
+ *
+ * Why the order matters: POST first, so the engine starts seeking; then clear the chart, because
+ * the old clip's numbers are meaningless now; then re-fetch zones, because a new clip has its own
+ * polygons and capacities. Snapshots keep arriving throughout and are ignored for the chart while
+ * `switching` is true.
+ *
+ * @param {string} name - a clip file name that /api/sources listed.
+ */
+async function changeSource(name) {
+  const frame = document.querySelector(".video-frame");
+  const label = document.getElementById("video-loading-label");
+  const select = document.getElementById("source-select");
+
+  app.switching = true;
+  select.disabled = true;
+  frame.classList.add("is-loading");
+  if (label) {
+    label.hidden = false;
+  }
+
+  try {
+    const response = await fetch("/api/source", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      // The API explains a bad name in its detail field; fall back to the status code.
+      let detail = `Server said ${response.status}`;
+      try {
+        const body = await response.json();
+        detail = body.detail || detail;
+      } catch (error) {
+        // A non-JSON error body is not worth a second failure; the status code is enough.
+      }
+      throw new Error(detail);
+    }
+
+    // The new clip's zones and capacities.
+    app.zoneDefs = await loadZones(name);
+    app.latestZones = new Map();
+    app.source = name;
+    document.getElementById("video-source-chip").textContent = name;
+
+    // A new clip means a new chart: different zones, and the old points describe other footage.
+    app.chart = { labels: [], total: [], perZone: {} };
+    app.zoneDefs.forEach((definition) => {
+      app.chart.perZone[definition.name] = [];
+    });
+    rebuildChart();
+    renderGauges(app.latestZones);
+    document.getElementById("chart-window").textContent = "waiting for the first samples";
+
+    // Restart the stream so the browser does not keep showing the previous clip's last frame.
+    attachVideo();
+    clearError();
+  } catch (error) {
+    showError(`Could not switch to ${name}: ${error.message}`, () => changeSource(name));
+    // Put the dropdown back on the clip that is actually playing.
+    if (app.source) {
+      select.value = app.source;
+    }
+  } finally {
+    app.switching = false;
+    select.disabled = false;
+    frame.classList.remove("is-loading");
+    if (label) {
+      label.hidden = true;
+    }
+  }
+}
+
+/**
+ * Fetches the zones for one clip and turns them into the gauge list.
+ *
+ * Why only name and capacity: /api/zones returns polygons too, which the browser does not draw -
+ * OpenCV draws them into the stream. Keeping just what the UI uses makes the state small.
+ *
+ * @param {string|null} source - a clip name, or null for the clip currently playing.
+ * @returns {Promise<Array<{name: string, capacity: number}>>} the zone list.
+ */
+async function loadZones(source = null) {
+  const url = source ? `/api/zones?source=${encodeURIComponent(source)}` : "/api/zones";
+  const zones = await getJson(url);
+  return (Array.isArray(zones) ? zones : []).map((zone) => ({
+    name: String(zone.name),
+    capacity: Number(zone.capacity) || 0,
+  }));
+}
+
+/* ---------------------------------------------------------------------------
+ * 13. Boot: first load
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Fills the source dropdown from GET /api/sources.
+ *
+ * @param {string[]} names - the clip file names the engine accepts.
+ * @param {string} current - the clip to select.
+ */
+function renderSources(names, current) {
+  const select = document.getElementById("source-select");
+  select.innerHTML = names
+    .map((name) =>
+      `<option value="${escapeHtml(name)}"${name === current ? " selected" : ""}>` +
+      `${escapeHtml(name)}</option>`)
+    .join("");
+  if (current) {
+    select.value = current;
+    document.getElementById("video-source-chip").textContent = current;
+  }
+}
+
+/**
+ * Loads the first screen: zones, alert history, chart history, sources, then the stream.
+ *
+ * Why Promise.allSettled and not Promise.all: one slow or failing endpoint must not stop the
+ * others from appearing. A dashboard with gauges, alerts and a video but no chart is far more
+ * useful than a blank page, and the error bar still reports the one that failed.
+ *
+ * @returns {Promise<string[]>} the names of the fetches that failed.
+ */
+async function loadInitialData() {
+  const jobs = {
+    zones: getJson("/api/zones"),
+    alerts: getJson("/api/alerts?limit=50"),
+    history: getJson("/api/history?minutes=10"),
+    sources: getJson("/api/sources"),
+  };
+
+  const results = await Promise.allSettled(Object.values(jobs));
+  const keys = Object.keys(jobs);
+  const failures = [];
+
+  const valueOf = (name) => {
+    const index = keys.indexOf(name);
+    const result = results[index];
+    if (result.status === "rejected") {
+      failures.push(name);
+      return null;
+    }
+    return result.value;
+  };
+
+  const zoneRows = valueOf("zones");
+  const alertRows = valueOf("alerts");
+  const historyRows = valueOf("history");
+  const sourceRows = valueOf("sources");
+
+  if (Array.isArray(zoneRows)) {
+    app.zoneDefs = zoneRows.map((zone) => ({
+      name: String(zone.name),
+      capacity: Number(zone.capacity) || 0,
+    }));
+  }
+
+  if (Array.isArray(alertRows)) {
+    app.alerts = alertRows.map(normaliseAlert);
+  }
+
+  const sources = Array.isArray(sourceRows) ? sourceRows : [];
+  const current = document.getElementById("source-select").value || sources[0] || "";
+  renderSources(sources, app.source || current);
+
+  // The chart needs the zone list to know how many lines to draw, so it is built after zones.
+  rebuildChart();
+  if (Array.isArray(historyRows)) {
+    prefillChart(historyRows);
+  }
+
+  renderGauges(app.latestZones);
+  renderAlerts(app.alerts);
+
+  // The first snapshot often arrives before these fetches finish, and showSkeletons() would
+  // otherwise be the last thing to touch the KPI cards - leaving them blank until the next
+  // message. Repainting from the snapshot already in hand closes that gap.
+  if (app.lastSnapshot) {
+    renderKpis(app.lastSnapshot);
+  } else {
+    // No message yet: land the skeleton on a real zero rather than leaving a placeholder that
+    // never resolves if the socket is slow.
+    animateKpi("people", 0);
+    animateKpi("peak", 0);
+    animateKpi("dwell", 0, "s");
+    animateKpi("fps", 0);
+  }
+
+  if (failures.length) {
+    showError(
+      `Could not load: ${failures.join(", ")}. The page will update as soon as the engine answers.`,
+      () => retryInitialLoad(),
+    );
+  }
+
+  return failures;
+}
+
+/**
+ * Retries the initial load after the user presses Retry.
+ *
+ * Why not reload the page: a reload would also restart the video stream and lose the chart the
+ * operator is watching. Retrying the four fetches is the smaller, faster action.
+ */
+async function retryInitialLoad() {
+  clearError();
+  showSkeletons();
+  const failures = await loadInitialData();
+  if (!failures.length) {
+    clearError();
+  }
+}
+
+/**
+ * Replaces the gauges, alert list, KPI numbers and both summaries with shimmering placeholders.
+ *
+ * Why: the engine takes a second or two to load YOLO, and a blank panel looks broken. A shimmer
+ * says "working" without inventing numbers.
  */
 function showSkeletons() {
-  const gauges = document.getElementById("zone-gauges");
-  gauges.innerHTML = `
+  document.getElementById("zone-gauges").innerHTML = `
     <div class="gauge-card"><div class="skeleton skeleton-ring"></div>
       <div class="skeleton skeleton-line" style="width:70%;margin:8px auto 0"></div></div>
     <div class="gauge-card"><div class="skeleton skeleton-ring"></div>
       <div class="skeleton skeleton-line" style="width:70%;margin:8px auto 0"></div></div>`;
 
-  const list = document.getElementById("alert-list");
-  list.innerHTML = `
+  document.getElementById("alert-list").innerHTML = `
     <li><div class="skeleton skeleton-row"></div></li>
     <li><div class="skeleton skeleton-row"></div></li>
     <li><div class="skeleton skeleton-row"></div></li>`;
 
-  // The KPI numbers become skeleton bars, so no stale figure is visible while loading.
   ["people", "peak", "dwell", "fps"].forEach((key) => {
     const node = document.querySelector(`[data-kpi="${key}"]`);
     if (node) {
@@ -636,77 +1586,79 @@ function showSkeletons() {
   document.getElementById("alerts-summary").textContent = "…";
 }
 
-/** Fills the source dropdown from the sample list. */
-function renderSources(names, current) {
-  const select = document.getElementById("source-select");
-  select.innerHTML = names
-    .map(
-      (name) =>
-        `<option value="${escapeHtml(name)}"${name === current ? " selected" : ""}>` +
-        `${escapeHtml(name)}</option>`,
-    )
-    .join("");
-  document.getElementById("video-source-chip").textContent = current;
+/** Paints the top-bar clock once and then every second. */
+function startClock() {
+  const node = document.getElementById("clock");
+  const tick = () => {
+    node.textContent = new Date().toLocaleTimeString("en-GB", { hour12: false });
+  };
+  tick();
+  setInterval(tick, 1000);
 }
 
 /**
- * Renders the whole dashboard from one data object.
+ * Starts the dashboard.
  *
- * Why a single entry point: the next step calls exactly this with a WebSocket snapshot instead of
- * SAMPLE, and every panel updates together. If each panel rendered itself from its own source,
- * the screen could show two different moments at once.
- *
- * @param {object} data - a SAMPLE-shaped object.
+ * Why the sockets and the fetches start together: the first snapshot may arrive before the zone
+ * list, and update() tolerates that; waiting for the fetches first would delay the numbers by a
+ * round trip for no benefit.
  */
-function renderAll(data) {
-  renderKpis(data);
-  renderGauges(data.zones);
-  renderAlerts(data.alerts);
-  renderChart(data.chart, data.chartCapacity);
-  // The banner names whichever zone has been over capacity the longest; the sample carries
-  // overFor on each zone, and the live snapshot will supply the same field.
-  renderBanner(worstZone(data.zones));
-}
-
-/** Wires the temporary preview buttons that prove each visual state. */
-function bindDevControls() {
-  document.getElementById("dev-banner-ok").addEventListener("click", () => {
-    renderBanner(null);
-  });
-  document.getElementById("dev-banner-over").addEventListener("click", () => {
-    renderBanner(SAMPLE.zones[0]);
-  });
-  document.getElementById("dev-skeleton").addEventListener("click", () => {
-    showSkeletons();
-    // A short delay so the shimmer is actually visible before the data returns.
-    setTimeout(() => renderAll(SAMPLE), 1600);
-  });
-  document.getElementById("dev-empty").addEventListener("click", () => {
-    renderAlerts([]);
-    // Restore the real log after a moment, so the button is a preview and not a one-way switch.
-    setTimeout(() => renderAlerts(SAMPLE.alerts), 2200);
-  });
-}
-
-/**
- * Starts the dashboard: skeleton first, then the sample data.
- *
- * Why a short delay before rendering: it makes the loading state visible on a fast local machine,
- * so the shimmer can be reviewed at all. In the next step this is replaced by "wait for the first
- * WebSocket snapshot".
- */
-function boot() {
+async function boot() {
   startClock();
-  renderSources(SAMPLE.sources, SAMPLE.source);
+  setLiveState("waiting");
   bindToggle("toggle-boxes", "boxes");
   bindToggle("toggle-zones", "zones");
   bindToggle("toggle-heat", "heat");
   bindFullscreen();
-  bindDevControls();
-
+  bindAlertList();
+  bindErrorBar();
+  bindSourceSelect();
   showSkeletons();
-  setTimeout(() => renderAll(SAMPLE), 700);
+
+  connectSocket();
+
+  const failures = await loadInitialData();
+  if (!failures.length) {
+    clearError();
+  }
+
+  // Attach the stream last: the server renders 15 frames a second from the moment the request
+  // arrives, so there is no point paying for it before the panels exist.
+  attachVideo();
 }
+
+/** Wires the dropdown: a change asks the engine to switch clips. */
+function bindSourceSelect() {
+  const select = document.getElementById("source-select");
+  select.addEventListener("change", () => {
+    const name = select.value;
+    if (name && name !== app.source) {
+      changeSource(name);
+    }
+  });
+}
+
+/** Wires the error bar's two buttons. */
+function bindErrorBar() {
+  document.getElementById("error-close").addEventListener("click", () => clearError());
+}
+
+// A stalled MJPEG stream leaves a static frame with no indication that it stopped. Browsers do
+// not fire an error event for that, so the state is reported through the pill instead.
+window.addEventListener("offline", () => {
+  setLiveState("reconnecting");
+  showError("This device is offline. The dashboard will reconnect automatically.");
+});
+
+window.addEventListener("online", () => {
+  clearError();
+  // A fresh socket is cheaper than waiting for the backoff timer on a connection that is dead.
+  if (app.reconnectTimer) {
+    clearTimeout(app.reconnectTimer);
+    app.reconnectTimer = null;
+  }
+  connectSocket();
+});
 
 // "loading" fires before images and fonts finish; DOMContentLoaded is enough for our element ids.
 if (document.readyState === "loading") {

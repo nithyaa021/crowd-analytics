@@ -344,6 +344,15 @@ body {
   display: none;
 }
 
+.video-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .video-idle {
   position: absolute;
   inset: 0;
@@ -366,6 +375,48 @@ body {
 .video-idle[hidden] {
   display: none;
 }
+
+/* While a different clip is being loaded, a shimmer sweeps the frame and a short label says
+   what is happening. Why not just an empty box: switching clips takes a second or two while the
+   engine seeks, and an empty box looks like a crash. */
+.video-frame.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  animation: shimmer 1.5s infinite;
+  pointer-events: none;
+}
+
+.video-loading-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 12px;
+  pointer-events: none;
+}
+
+.video-loading-label[hidden] {
+  display: none;
+}
+
+/* A small pulsing dot before the word "Loading", so the label reads as activity. */
+.video-loading-label .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  margin: 0 auto 4px;
+  animation: pulse-ring 1.4s infinite;
+}
+
+/* ---------- Overlay toggles ---------- */
 
 .overlay-toggles {
   position: absolute;
@@ -738,41 +789,272 @@ body {
 .skeleton-ring { height: 96px; width: 96px; border-radius: 999px; margin: 0 auto; }
 .skeleton-row { height: 46px; border-radius: 11px; }
 
-/* ---------- Dev preview controls (temporary, removed in P7) ---------- */
+/* ---------- Live pill states ---------- */
 
-.dev-cluster {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  border: 1px dashed rgba(143, 163, 191, 0.32);
-  background: rgba(143, 163, 191, 0.05);
+/* Why a colour change and not just text: at a glance, green means "numbers are arriving" and
+   amber means "these numbers are a few seconds old". Both states are also named in words for
+   anyone who cannot use colour. */
+.live-pill.is-live {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
 }
 
-.dev-cluster .dev-label {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.live-pill.is-reconnecting {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+}
+
+/* The dot follows the pill, so the pulse only runs while the numbers are actually live. */
+.live-pill.is-reconnecting .live-dot {
+  background: var(--warn);
+  animation: none;
+}
+
+.live-pill.is-waiting {
+  border-color: var(--border);
+  background: rgba(143, 163, 191, 0.1);
   color: var(--muted);
 }
 
-.dev-btn {
-  padding: 3px 9px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text);
-  font: inherit;
-  font-size: 10.5px;
+.live-pill.is-waiting .live-dot {
+  background: var(--muted);
+  animation: none;
+}
+
+/* ---------- Inline error bar ---------- */
+
+.error-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 11px;
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fde68a;
+  font-size: 12px;
   font-weight: 500;
+}
+
+.error-bar[hidden] {
+  display: none;
+}
+
+.error-icon svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+/* The message is allowed to wrap and take the free space; the two buttons never shrink. */
+.error-bar span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.error-retry,
+.error-close {
+  flex: none;
+  border-radius: 7px;
+  border: 1px solid rgba(253, 230, 138, 0.35);
+  background: rgba(253, 230, 138, 0.12);
+  color: #fde68a;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.dev-btn:hover {
-  background: rgba(255, 255, 255, 0.11);
+.error-retry {
+  padding: 3px 10px;
+}
+
+.error-close {
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  font-size: 15px;
+}
+
+.error-retry:hover,
+.error-close:hover {
+  background: rgba(253, 230, 138, 0.22);
+}
+
+/* ---------- Toast ---------- */
+
+/* Fixed to the bottom-right so a new alert can never shift the layout under the mouse. */
+.toast-stack {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(340px, calc(100vw - 28px));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(24, 12, 18, 0.94);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9);
+  color: var(--text);
+  font-size: 12px;
+  pointer-events: auto;
+  animation: toast-in 0.22s ease-out;
+}
+
+.toast.is-leaving {
+  animation: toast-out 0.2s ease-in forwards;
+}
+
+.toast-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+
+.toast-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.toast-body {
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fca5a5;
+}
+
+.toast-text {
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* The slide is small on purpose: a long travel would draw the eye away from the alert log. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(6px); }
+}
+
+/* ---------- New-alert flash ---------- */
+
+/* A single 1.6 s pulse on the row that just arrived. Why an outline and not a background:
+   the row's background already encodes active/cleared, and overwriting it would hide that. */
+.alert-row.is-new {
+  animation: alert-flash 1.6s ease-out;
+}
+
+@keyframes alert-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.65); }
+  55%  { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* The thumbnail becomes a real button only when there is a photo to open. */
+.alert-thumb.is-clickable {
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.alert-thumb.is-clickable:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  transform: scale(1.04);
+}
+
+/* ---------- Evidence modal ---------- */
+
+.evidence-modal {
+  width: min(760px, calc(100vw - 24px));
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: #0b1220;
+  color: var(--text);
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.95);
+}
+
+/* A dimmed, slightly blurred backdrop keeps the alert log visible but clearly behind. */
+.evidence-modal::backdrop {
+  background: rgba(3, 6, 12, 0.72);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.evidence-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.evidence-title {
+  margin: 1px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.evidence-body {
+  padding: 12px 14px 0;
+}
+
+.evidence-body img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #04070f;
+}
+
+/* No src yet means no picture; the note replaces the broken-image glyph. */
+.evidence-body img:not([src]) {
+  display: none;
+}
+
+.evidence-empty {
+  margin: 0;
+  padding: 26px 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.evidence-meta {
+  padding: 10px 14px 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Focus and scrollbars ---------- */
