@@ -88,6 +88,8 @@ const app = {
   source: "",
   // The most recent snapshot, kept so the KPI row can be repainted after the fetches finish.
   lastSnapshot: null,
+  // Counts WebSocket messages that could not be parsed, so a bad frame is visible but silent.
+  badMessages: 0,
   // In-flight KPI animations, key -> { frame, timer }, so a new value can cancel the old one.
   kpiAnim: new Map(),
 };
@@ -499,6 +501,8 @@ function renderGauges(latest) {
   }
 
   container.innerHTML = gaugeMarkup(latest);
+  // Real content has arrived, so the panel is no longer waiting for a shape to replace.
+  container.removeAttribute("aria-busy");
 
   // Summary chip: how many zones are over, which is the single number worth reading at a glance.
   const overCount = app.zoneDefs.filter((definition) => {
@@ -558,11 +562,16 @@ function alertRowMarkup(alert, isNew) {
 
   // A real thumbnail when there is a keyframe, a placeholder frame otherwise. Only a real photo
   // becomes a button: opening a modal on an empty placeholder would waste the click.
+  //
+  // Why the <img> carries alt text even though the button already has an aria-label: if the
+  // button's label were ever dropped, the image would still describe itself. The aria-label
+  // stays the accessible name because a button's own label wins over its contents.
   const thumb = alert.keyframe
     ? `<button type="button" class="alert-thumb is-clickable" data-alert-id="${alert.id}"
               data-keyframe="${escapeHtml(alert.keyframe)}"
               aria-label="Open evidence for ${escapeHtml(alert.zone)}">
-         <img src="${escapeHtml(alert.keyframe)}" alt="">
+         <img src="${escapeHtml(alert.keyframe)}"
+              alt="Snapshot of ${escapeHtml(alert.zone)} at ${escapeHtml(alert.startedAt)}">
        </button>`
     : `<span class="alert-thumb">
          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -606,6 +615,26 @@ function updateTitle(activeCount) {
 }
 
 /**
+ * Writes the alert log's summary chip and the browser tab title.
+ *
+ * Why one function: three places change the list (the first load, a new alert, the live
+ * reconciliation) and all three must leave the same two indicators agreeing with the rows.
+ *
+ * Example: 2 active of 30 rows -> chip "2 active / 30", title "(2) Crowd Analytics".
+ *
+ * @param {object[]} alerts - normalised alerts currently on screen.
+ */
+function paintAlertSummary(alerts) {
+  const summary = document.getElementById("alerts-summary");
+  const activeCount = alerts.filter((alert) => alert.active).length;
+  summary.textContent = alerts.length
+    ? `${activeCount} active / ${alerts.length}`
+    : "0";
+  summary.style.color = activeCount > 0 ? "var(--crit)" : "var(--ok)";
+  updateTitle(activeCount);
+}
+
+/**
  * Writes the alert log, or the empty state when there is nothing to show.
  *
  * Why the empty state matters: an empty list looks identical to a broken panel. "No alerts. All
@@ -616,7 +645,6 @@ function updateTitle(activeCount) {
  */
 function renderAlerts(alerts, newId = 0) {
   const list = document.getElementById("alert-list");
-  const summary = document.getElementById("alerts-summary");
 
   if (!alerts.length) {
     list.innerHTML = `
@@ -627,20 +655,14 @@ function renderAlerts(alerts, newId = 0) {
         </svg>
         <span>No alerts. All zones normal.</span>
       </li>`;
-    summary.textContent = "0";
-    summary.style.color = "var(--ok)";
-    // The title must be reset here too: an empty list is the most common way to go back to zero,
-    // and leaving "(1)" in the tab would be a lie that outlives the alert.
-    updateTitle(0);
+    list.removeAttribute("aria-busy");
+    paintAlertSummary(alerts);
     return;
   }
 
   list.innerHTML = alerts.map((alert) => alertRowMarkup(alert, alert.id === newId)).join("");
-
-  const activeCount = alerts.filter((alert) => alert.active).length;
-  summary.textContent = `${activeCount} active / ${alerts.length}`;
-  summary.style.color = activeCount > 0 ? "var(--crit)" : "var(--muted)";
-  updateTitle(activeCount);
+  list.removeAttribute("aria-busy");
+  paintAlertSummary(alerts);
 }
 
 /**
@@ -668,7 +690,22 @@ function prependAlert(rawAlert, context = {}) {
   app.alerts.unshift(alert);
   // The log shows the newest 50; anything past that is still in the database.
   app.alerts = app.alerts.slice(0, 50);
-  renderAlerts(app.alerts, alert.id);
+
+  const list = document.getElementById("alert-list");
+
+  // The skeleton or empty state has no rows to preserve, so the first real alert builds the list.
+  if (list.querySelector(".empty-state") || !list.querySelector(".alert-row")) {
+    renderAlerts(app.alerts, alert.id);
+    return;
+  }
+
+  // Otherwise insert one row at the top. Why not renderAlerts() here: that replaces the whole
+  // list, which throws away the scroll position - and an operator reading row 12 should not be
+  // sent back to row 1 because a new alert arrived. Drop the last row to keep the list at 50.
+  list.querySelector(".alert-row:last-child")?.remove();
+  list.insertAdjacentHTML("afterbegin", alertRowMarkup(alert, true));
+  list.removeAttribute("aria-busy");
+  paintAlertSummary(app.alerts);
 }
 
 /* ---------------------------------------------------------------------------
@@ -901,26 +938,22 @@ function rebuildChart() {
  */
 function paintLegend() {
   const legend = document.getElementById("chart-legend");
-  const fixed = `
-    <span class="inline-flex items-center gap-1.5">
-      <span style="width:14px;height:2px;border-radius:2px;background:var(--accent)"></span>
-      Total
+  // One key is one 16 px swatch plus a word. Rebuilt from app.zoneDefs so a clip with two
+  // zones gets two swatches without any change here.
+  const key = (color, label) => `
+    <span class="inline-flex items-center gap-2">
+      <span class="legend-swatch" style="background:${color}"></span>
+      ${label}
     </span>`;
+
+  const fixed = key("var(--accent)", "Total");
   const zones = app.zoneDefs
-    .map((definition, index) => `
-      <span class="inline-flex items-center gap-1.5">
-        <span style="width:14px;height:2px;border-radius:2px;
-                     background:${zoneColor(index)}"></span>
-        ${escapeHtml(definition.name)}
-      </span>`)
+    .map((definition, index) => key(zoneColor(index), escapeHtml(definition.name)))
     .join("");
-  const capacity = `
-    <span class="inline-flex items-center gap-1.5">
-      <span style="width:14px;height:2px;border-radius:2px;
-                   background:repeating-linear-gradient(90deg,var(--crit) 0 4px,transparent 4px 7px)">
-      </span>
-      Capacity
-    </span>`;
+  const capacity = key(
+    "repeating-linear-gradient(90deg,var(--crit) 0 4px,transparent 4px 7px)",
+    "Capacity",
+  );
   legend.innerHTML = fixed + zones + capacity;
 }
 
@@ -1097,7 +1130,13 @@ function connectSocket() {
       update(JSON.parse(event.data));
     } catch (error) {
       // A malformed message must not kill the socket; the next one is probably fine.
-      console.warn("Bad snapshot", error);
+      //
+      // Why this is counted instead of console.warn'd: the brief asks for a console with no
+      // noise, and a warning twice a second would bury a real error. A count shown in the
+      // footer is quieter for the demo and still visible to whoever is debugging.
+      app.badMessages += 1;
+      document.getElementById("footer-status").textContent =
+        `Skipped ${app.badMessages} malformed message${app.badMessages === 1 ? "" : "s"} · still live`;
     }
   });
 
@@ -1153,20 +1192,32 @@ function scheduleReconnect() {
  */
 function reconcileActiveAlerts(latest) {
   let changed = false;
+  const list = document.getElementById("alert-list");
+
   app.alerts = app.alerts.map((alert) => {
-    // Only the newest few can plausibly still be running; the rest are history.
     if (!alert.active) {
       return alert;
     }
     const zone = latest.get(alert.zone);
-    if (zone && (Number(zone.over_for) || 0) <= 0) {
-      changed = true;
-      return { ...alert, active: false };
+    if (!zone || (Number(zone.over_for) || 0) > 0) {
+      return alert;
     }
-    return alert;
+
+    changed = true;
+    // Flip the existing row in place instead of re-rendering the list. Why: a re-render resets
+    // the scroll position, and this fires while an operator may be reading further down.
+    const row = list.querySelector(`.alert-row[data-alert-id="${alert.id}"]`);
+    if (row) {
+      row.classList.remove("is-active");
+      const tag = row.querySelector(".alert-tag");
+      tag.className = "alert-tag cleared";
+      tag.textContent = "Cleared";
+    }
+    return { ...alert, active: false };
   });
+
   if (changed) {
-    renderAlerts(app.alerts);
+    paintAlertSummary(app.alerts);
   }
 }
 
@@ -1564,23 +1615,27 @@ async function retryInitialLoad() {
  * says "working" without inventing numbers.
  */
 function showSkeletons() {
-  document.getElementById("zone-gauges").innerHTML = `
-    <div class="gauge-card"><div class="skeleton skeleton-ring"></div>
-      <div class="skeleton skeleton-line" style="width:70%;margin:8px auto 0"></div></div>
-    <div class="gauge-card"><div class="skeleton skeleton-ring"></div>
-      <div class="skeleton skeleton-line" style="width:70%;margin:8px auto 0"></div></div>`;
+  // Two skeleton gauge cards, built as one string so the markup cannot drift between them.
+  const gaugeCard = `
+    <div class="gauge-card">
+      <div class="skeleton skeleton-ring"></div>
+      <div class="skeleton skeleton-line skeleton-gauge-line"></div>
+    </div>`;
+  document.getElementById("zone-gauges").innerHTML = gaugeCard + gaugeCard;
 
-  document.getElementById("alert-list").innerHTML = `
-    <li><div class="skeleton skeleton-row"></div></li>
-    <li><div class="skeleton skeleton-row"></div></li>
-    <li><div class="skeleton skeleton-row"></div></li>`;
+  // Three rows is about one screenful of a scrolling log: enough to show the shape of it.
+  const alertRow = '<li><div class="skeleton skeleton-row"></div></li>';
+  document.getElementById("alert-list").innerHTML = alertRow + alertRow + alertRow;
 
+  // A skeleton is a shape, not a number, so it is not announced: aria-busy says "waiting".
   ["people", "peak", "dwell", "fps"].forEach((key) => {
     const node = document.querySelector(`[data-kpi="${key}"]`);
     if (node) {
-      node.innerHTML = '<span class="skeleton skeleton-value" style="display:block"></span>';
+      node.innerHTML = '<span class="skeleton skeleton-value"></span>';
     }
   });
+  document.getElementById("zone-gauges").setAttribute("aria-busy", "true");
+  document.getElementById("alert-list").setAttribute("aria-busy", "true");
 
   document.getElementById("zones-summary").textContent = "…";
   document.getElementById("alerts-summary").textContent = "…";

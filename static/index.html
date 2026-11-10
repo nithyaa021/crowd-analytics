@@ -6,16 +6,21 @@
   <title>Crowd Analytics — Density &amp; Bottleneck Monitor</title>
   <meta name="description" content="Live crowd density, zone capacity and bottleneck analytics dashboard.">
 
-  <!-- Inter is loaded from Google Fonts; the CSS falls back to system UI fonts if it is blocked. -->
+  <!-- Inter is optional polish: if this request fails (offline demo), the CSS falls back to
+       system-ui, so the page still looks right. It is a <link>, not a blocking @import, so a
+       slow font server can never delay first paint. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
 
-  <!-- Tailwind supplies layout utilities only. Every visual token lives in style.css. -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vendored, so the demo runs with the network cable unplugged: no CDN, no build step.
+       Tailwind supplies layout utilities only; every visual token lives in style.css. -->
+  <script src="/static/vendor/tailwind.js"></script>
   <!-- Chart.js draws the headcount line. It is the only charting library we use. -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/static/vendor/chart.umd.min.js"></script>
 
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070B14'/%3E%3Cg stroke='%2338BDF8' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M10 23v-6'/%3E%3Cpath d='M16 23V13'/%3E%3Cpath d='M22 23V9'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 
@@ -37,7 +42,7 @@
 
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h1 class="truncate text-[15px] font-semibold tracking-tight sm:text-base">
+            <h1 class="product-title truncate">
               Crowd Analytics
             </h1>
             <!-- The tag is hidden on phones: at 360 px it competes with the title and the
@@ -45,7 +50,7 @@
             <span class="tag hidden sm:inline-flex">Track A</span>
           </div>
           <!-- Hidden on the narrowest phones so the bar never wraps. -->
-          <p class="hidden truncate text-[11px] text-[var(--muted)] sm:block">
+          <p class="product-sub hidden truncate sm:block">
             Density &amp; bottleneck monitor
           </p>
         </div>
@@ -122,7 +127,10 @@
              class="mb-3 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
       <article class="glass kpi-card" id="kpi-people">
         <div class="kpi-top">
-          <span class="icon-badge" aria-hidden="true">
+          <!-- data-tip is read by CSS (an instant tooltip); the icon is aria-hidden because the
+               label and caption underneath already say the same thing in text. -->
+          <span class="icon-badge" aria-hidden="true"
+                data-tip="How many people are inside the monitored zones right now.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
@@ -139,7 +147,8 @@
 
       <article class="glass kpi-card" id="kpi-peak">
         <div class="kpi-top">
-          <span class="icon-badge" aria-hidden="true">
+          <span class="icon-badge" aria-hidden="true"
+                data-tip="The largest number seen in a single frame since this clip started.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 17l6-6 4 4 7-7"></path>
@@ -154,7 +163,8 @@
 
       <article class="glass kpi-card" id="kpi-dwell">
         <div class="kpi-top">
-          <span class="icon-badge" aria-hidden="true">
+          <span class="icon-badge" aria-hidden="true"
+                data-tip="How long a person stays in the busiest zone, averaged over visits.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="9"></circle>
@@ -169,7 +179,8 @@
 
       <article class="glass kpi-card" id="kpi-fps">
         <div class="kpi-top">
-          <span class="icon-badge" aria-hidden="true">
+          <span class="icon-badge" aria-hidden="true"
+                data-tip="How many video frames the detector can process per second on this CPU.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"></path>
@@ -209,7 +220,7 @@
                   <path d="M10 9l5 3-5 3V9z"></path>
                 </svg>
                 <span id="video-idle-text">Waiting for the first frame…</span>
-                <div style="font-size:10.5px;opacity:.7;margin-top:2px">
+                <div class="video-idle-hint">
                   the engine takes a few seconds to load the model
                 </div>
               </div>
@@ -270,28 +281,27 @@
           <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div>
               <span class="section-title">Headcount</span>
-              <p class="mt-0.5 text-[11px] text-[var(--muted)]" id="chart-window">
+              <p class="product-sub" id="chart-window">
                 last 120 samples
               </p>
             </div>
             <!-- The legend is written as HTML, so the capacity line is labelled without
                  relying on Chart.js's own legend rendering. The zone swatches are added by
                  app.js once /api/zones has answered. -->
-            <div class="flex flex-wrap items-center gap-3 text-[10.5px] text-[var(--muted)]"
-                 id="chart-legend">
-              <span class="inline-flex items-center gap-1.5">
-                <span style="width:14px;height:2px;border-radius:2px;background:var(--accent)"></span>
+            <div class="flex flex-wrap items-center gap-3 product-sub" id="chart-legend">
+              <span class="inline-flex items-center gap-2">
+                <span class="legend-swatch" style="background:var(--accent)"></span>
                 Total
               </span>
-              <span class="inline-flex items-center gap-1.5">
-                <span style="width:14px;height:2px;border-radius:2px;
-                             background:repeating-linear-gradient(90deg,var(--crit) 0 4px,transparent 4px 7px)">
+              <span class="inline-flex items-center gap-2">
+                <span class="legend-swatch"
+                      style="background:repeating-linear-gradient(90deg,var(--crit) 0 4px,transparent 4px 7px)">
                 </span>
                 Capacity
               </span>
             </div>
           </div>
-          <div style="position:relative;height:190px">
+          <div class="chart-box">
             <canvas id="headcount-chart" aria-label="Headcount over time chart" role="img"></canvas>
           </div>
         </section>
@@ -310,11 +320,11 @@
           <div class="gauge-grid" id="zone-gauges">
             <div class="gauge-card">
               <div class="skeleton skeleton-ring"></div>
-              <div class="skeleton skeleton-line" style="width:70%;margin:8px auto 0"></div>
+              <div class="skeleton skeleton-line skeleton-gauge-line"></div>
             </div>
             <div class="gauge-card">
               <div class="skeleton skeleton-ring"></div>
-              <div class="skeleton skeleton-line" style="width:70%;margin:8px auto 0"></div>
+              <div class="skeleton skeleton-line skeleton-gauge-line"></div>
             </div>
           </div>
         </section>
@@ -325,14 +335,25 @@
             <span class="section-title">Alert log</span>
             <span class="chip-meta" id="alerts-summary">—</span>
           </div>
-          <ul class="alert-list" id="alert-list" aria-live="polite"></ul>
+          <!-- tabindex: this list scrolls, and a scrollable box that no key can reach is a WCAG
+               2.1.1 failure for anyone not using a mouse. Focusing the region lets the arrow
+               keys and Page Down scroll it without entering every row. -->
+          <ul class="alert-list" id="alert-list" aria-live="polite" tabindex="0"></ul>
         </section>
       </div>
     </div>
 
-    <p class="mt-4 text-center text-[10.5px] text-[var(--muted)]" id="footer-status">
-      Connecting to the engine…
-    </p>
+    <!-- ============ 5. Footer ============ -->
+    <!-- Two lines, both centred and quiet: the live status first (it changes), then the credit
+         and the model that produced the numbers. -->
+    <footer class="mt-4 text-center">
+      <p class="footer-status" id="footer-status">
+        Connecting to the engine…
+      </p>
+      <p class="footer-credit">
+        Cogno Valley Labs, Internship Round 1 · YOLOv8n + ByteTrack on CPU
+      </p>
+    </footer>
   </main>
 
   <!-- ============ 6. Toast ============ -->

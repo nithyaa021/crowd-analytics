@@ -1,0 +1,7 @@
+# Vendored third-party builds are stored byte-for-byte, exactly as downloaded.
+#
+# Why: git's default "text" handling rewrites line endings on checkout. These files are
+# minified, so a rewrite is not a syntax problem - but it does mean the copy in the repository
+# no longer matches the published release, and a checksum could not verify it. Marking them
+# "-text" tells git to store the bytes untouched.
+static/vendor/** -text

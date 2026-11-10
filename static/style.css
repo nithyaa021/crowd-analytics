@@ -1,9 +1,16 @@
 /* Crowd Analytics dashboard: design tokens and component styles.
  *
- * Why this file is separate from the Tailwind CDN: Tailwind supplies layout (grid, flex,
- * spacing), but everything visual that makes this look like one product lives here. The
- * palette is declared once in :root, so re-theming the whole dashboard is one edit, and
- * the sample data can change without a single style being touched.
+ * Why this file is separate from Tailwind: Tailwind supplies layout (grid, flex, spacing),
+ * but everything that makes this look like one product lives here. The palette, the type
+ * scale, the corner radii and the spacing steps are declared once in :root, so re-theming
+ * the dashboard is one edit and no component invents its own value.
+ *
+ * The three rules this file follows everywhere:
+ *   1. Two font weights only: 400 for reading, 600 for emphasis.
+ *   2. Three corner radii plus a pill: 16 for cards, 10 for blocks inside a card,
+ *      8 for controls, 999 for pills.
+ *   3. Spacing is a multiple of 4 px. The only exceptions are 1 px borders, 2 px optical
+ *      nudges that pull a label closer to its number, and icon stroke widths.
  */
 
 :root {
@@ -13,8 +20,8 @@
   /* The card fill is translucent on purpose: the page's radial glows show through it. */
   --card: rgba(17, 26, 46, 0.72);
   --border: rgba(255, 255, 255, 0.08);
-  /* A brighter border for the one element that is currently "hot". */
-  --border-strong: rgba(255, 255, 255, 0.14);
+  /* A brighter border for the element under the pointer, or the one that is "hot". */
+  --border-strong: rgba(255, 255, 255, 0.16);
 
   /* ---------- Semantic colour ---------- */
   --accent: #38bdf8;
@@ -22,13 +29,37 @@
   --warn: #f59e0b;
   --crit: #ef4444;
   --text: #e6edf7;
+  /* Measured against the card fill: 7.03:1, which passes WCAG AAA for body text. */
   --muted: #8fa3bf;
 
   /* ---------- Shape ---------- */
-  --radius: 16px;
-  --radius-sm: 10px;
+  --radius: 16px;      /* a card */
+  --radius-md: 10px;   /* a block inside a card */
+  --radius-sm: 8px;    /* a control: chip, button, select, thumbnail */
+  --radius-pill: 999px;
+
+  /* ---------- Type scale ----------
+   * Every size in the file comes from this list. Why a fixed list: fractional sizes
+   * (10.5, 11.5, 12.5) made two headings that should match differ by half a pixel, which
+   * reads as sloppy without anyone being able to say why. */
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-2xl: 26px;
+  --fs-3xl: 30px;
+
+  /* ---------- Elevation ---------- */
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 40px -20px rgba(0, 0, 0, 0.85);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 48px -22px rgba(0, 0, 0, 0.95);
   --shadow-hot: 0 0 0 1px rgba(239, 68, 68, 0.35), 0 18px 44px -22px rgba(239, 68, 68, 0.55);
+
+  /* ---------- Motion ---------- */
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 0.15s;
+  --dur-base: 0.24s;
+  --dur-slow: 0.9s;
 }
 
 /* ---------- Base ---------- */
@@ -54,8 +85,10 @@ body {
     radial-gradient(760px 460px at 96% -6%, rgba(34, 197, 94, 0.07), transparent 58%);
   background-attachment: fixed;
   color: var(--text);
-  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 14px;
+  /* system-ui first after Inter: with the font CDN blocked, the fallback is this stack. */
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: var(--fs-sm);
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -76,6 +109,20 @@ body {
   /* The blur is what makes the card read as glass: it samples the page glow behind it. */
   -webkit-backdrop-filter: blur(14px) saturate(150%);
   backdrop-filter: blur(14px) saturate(150%);
+  /* Only transform and the two shadow values animate, so a hover never repaints the blur. */
+  transition: transform var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out);
+}
+
+/* The lift is 2 px and only for a real pointer. Why the guard: on a touch screen a hover
+   style sticks after a tap, so a card would stay raised until something else was tapped. */
+@media (hover: hover) and (pointer: fine) {
+  .glass:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-lift);
+  }
 }
 
 /* The congestion source of a warning gets a faint red edge, so the eye finds it first. */
@@ -85,7 +132,7 @@ body {
 }
 
 .section-title {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -93,11 +140,12 @@ body {
 }
 
 .icon-badge {
+  position: relative;
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: rgba(56, 189, 248, 0.12);
   color: var(--accent);
   flex: none;
@@ -108,6 +156,57 @@ body {
   height: 17px;
 }
 
+/* ---------- KPI icon tooltips ---------- */
+
+/* Why a CSS tooltip: the icon is decorative (aria-hidden), so a tooltip must not cost a
+   tab stop, and title="" waits about a second before appearing. This one is instant.
+   The same sentence is always visible in the caption underneath, which is what a screen
+   reader reads - so nothing is available only on hover.
+
+   Why display:none at rest: a hidden-but-laid-out tooltip still counts towards the page's
+   scrollable width. At 360 px these 208 px boxes pushed the whole page 53 px sideways, which
+   is the one responsive bug this pass had to fix. display:none removes it from layout, and a
+   keyframe animation (not a transition) still gives the fade-in. */
+.icon-badge[data-tip]::after {
+  content: attr(data-tip);
+  display: none;
+  position: absolute;
+  left: 0;
+  /* Below the icon, not above it. Why: the badge sits 16 px from the card's top edge, so an
+     upward tooltip on the first row lands under the sticky header (z-40) and is half hidden.
+     Opening downward always stays inside the card, and the card never clips it. */
+  top: calc(100% + 8px);
+  z-index: 30;
+  width: max-content;
+  max-width: 208px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: #0b1220;
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.95);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  pointer-events: none;
+}
+
+/* The 100 ms delay in the animation shorthand is deliberate: sweeping the pointer across the
+   KPI row should not fire four tooltips in a row. "both" holds the tooltip invisible during
+   that delay instead of flashing it at full opacity. */
+.icon-badge[data-tip]:hover::after {
+  display: block;
+  animation: tip-in var(--dur-fast) var(--ease-out) 0.1s both;
+}
+
+@keyframes tip-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ---------- Top bar ---------- */
 
 .logo-mark {
@@ -115,7 +214,7 @@ body {
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: linear-gradient(150deg, rgba(56, 189, 248, 0.9), rgba(56, 189, 248, 0.35));
   color: #04121f;
   box-shadow: 0 0 22px -6px rgba(56, 189, 248, 0.8);
@@ -127,15 +226,30 @@ body {
   height: 19px;
 }
 
+/* The product name and its one-line description. Why classes and not Tailwind's text-[15px]:
+   the type scale lives in :root, and an arbitrary bracket value would be a second scale. */
+.product-title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.product-sub {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -148,32 +262,34 @@ body {
 .live-pill {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 11px 5px 9px;
-  border-radius: 999px;
+  gap: 8px;
+  padding: 4px 12px 4px 8px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(34, 197, 94, 0.3);
   background: rgba(34, 197, 94, 0.1);
   color: #86efac;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--fs-xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
+  transition: color var(--dur-base) linear, background-color var(--dur-base) linear,
+              border-color var(--dur-base) linear;
 }
 
 /* The dot itself is solid; the ring around it is an animated box-shadow, which costs less
    than animating a real element and never shifts the layout. */
 .live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
   background: var(--ok);
   animation: pulse-ring 2s infinite;
 }
 
 @keyframes pulse-ring {
   0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
-  70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+  70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
   100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
 }
 
@@ -181,8 +297,9 @@ body {
 
 .source-select {
   appearance: none;
-  padding: 6px 30px 6px 11px;
-  border-radius: 9px;
+  height: 32px;
+  padding: 0 32px 0 12px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background-color: rgba(255, 255, 255, 0.04);
   /* The chevron is an inline SVG data URI so no icon library is needed. */
@@ -192,22 +309,30 @@ body {
   background-size: 13px;
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
+  font-weight: 400;
   max-width: 100%;
   cursor: pointer;
+  transition: border-color var(--dur-fast) linear, background-color var(--dur-fast) linear;
+}
+
+.source-select:hover {
+  border-color: var(--border-strong);
+  background-color: rgba(255, 255, 255, 0.07);
 }
 
 .chip-meta {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 8px;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: 400;
   white-space: nowrap;
 }
 
@@ -221,21 +346,29 @@ body {
 .banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 16px;
-  border-radius: 12px;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
   /* A red gradient, not a flat fill: the eye reads it as an alarm even at a glance. */
   background: linear-gradient(90deg, #7f1d1d 0%, #dc2626 38%, #ef4444 62%, #991b1b 100%);
   border: 1px solid rgba(255, 160, 160, 0.35);
   box-shadow: 0 10px 30px -12px rgba(239, 68, 68, 0.65);
   color: #fff;
-  font-size: 12.5px;
+  font-size: var(--fs-md);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  /* The slide runs when the element goes from display:none to flex, which is exactly when
+     a congestion starts. 6 px of travel is enough to catch the eye without moving the page. */
+  animation: banner-in var(--dur-base) var(--ease-out);
 }
 
 .banner[hidden] {
   display: none;
+}
+
+@keyframes banner-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .banner-icon {
@@ -255,23 +388,23 @@ body {
   50% { opacity: 0.65; transform: scale(0.92); }
 }
 
+/* min-width:0 is what lets a long zone name wrap instead of pushing the banner wide. */
 .banner-text {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .banner-text .banner-count {
-  opacity: 0.85;
-  font-weight: 500;
+  opacity: 0.88;
+  font-weight: 400;
 }
 
 /* ---------- KPI cards ---------- */
 
 .kpi-card {
-  padding: 15px 16px 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-width: 0;
 }
 
@@ -280,35 +413,38 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .kpi-value {
-  font-size: 30px;
+  font-size: var(--fs-3xl);
   line-height: 1.05;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .kpi-value .unit {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--fs-lg);
+  font-weight: 400;
   color: var(--muted);
-  margin-left: 3px;
+  margin-left: 2px;
   letter-spacing: 0;
 }
 
+/* 2 px above the label is an optical nudge, not a layout gap: the number's line box already
+   carries space, and at 4 px the pair reads as two unrelated items. */
 .kpi-label {
-  margin-top: 5px;
-  font-size: 12.5px;
+  margin-top: 2px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text);
 }
 
 .kpi-caption {
-  margin-top: 1px;
-  font-size: 11px;
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 400;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -322,7 +458,7 @@ body {
   aspect-ratio: 16 / 9;
   width: 100%;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: #04070f;
   /* A faint inner ring stops the video edge from dissolving into the card. */
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -338,19 +474,10 @@ body {
 }
 
 /* Until the stream URL is set, the <img> has no src. Browsers render a broken-image glyph and
-   the alt text in that state, which would sit on top of the "Video appears here" placeholder.
-   Hiding the element while it has no source avoids that without any JavaScript. */
+   the alt text in that state, which would sit on top of the "Waiting for the first frame"
+   placeholder. Hiding the element while it has no source avoids that without any JavaScript. */
 .video-frame img:not([src]) {
   display: none;
-}
-
-.video-frame img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
 }
 
 .video-idle {
@@ -361,19 +488,28 @@ body {
   gap: 8px;
   text-align: center;
   color: var(--muted);
-  font-size: 12px;
-  padding: 12px;
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  padding: 16px;
 }
 
 .video-idle svg {
   width: 26px;
   height: 26px;
   opacity: 0.6;
-  margin: 0 auto 6px;
+  margin: 0 auto 8px;
 }
 
 .video-idle[hidden] {
   display: none;
+}
+
+/* The second line of the placeholder: smaller and dimmer than the first, so it reads as a
+   note rather than as a second message. */
+.video-idle-hint {
+  margin-top: 2px;
+  font-size: var(--fs-2xs);
+  opacity: 0.7;
 }
 
 /* While a different clip is being loaded, a shimmer sweeps the frame and a short label says
@@ -394,11 +530,12 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
-  gap: 6px;
+  gap: 8px;
   text-align: center;
   color: var(--muted);
-  font-size: 12px;
-  padding: 12px;
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  padding: 16px;
   pointer-events: none;
 }
 
@@ -408,9 +545,9 @@ body {
 
 /* A small pulsing dot before the word "Loading", so the label reads as activity. */
 .video-loading-label .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   margin: 0 auto 4px;
   animation: pulse-ring 1.4s infinite;
@@ -420,14 +557,14 @@ body {
 
 .overlay-toggles {
   position: absolute;
-  left: 10px;
-  bottom: 10px;
+  left: 12px;
+  bottom: 12px;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   /* The backdrop is what keeps the chips readable over a bright video frame. */
-  padding: 5px;
-  border-radius: 10px;
+  padding: 4px;
+  border-radius: var(--radius-md);
   background: rgba(4, 8, 16, 0.55);
   border: 1px solid var(--border);
   -webkit-backdrop-filter: blur(8px);
@@ -437,17 +574,19 @@ body {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 9px;
-  border-radius: 7px;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  transition: background-color var(--dur-fast) linear, color var(--dur-fast) linear,
+              border-color var(--dur-fast) linear, transform var(--dur-fast) var(--ease-out);
 }
 
 .chip svg {
@@ -458,6 +597,11 @@ body {
 .chip:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
+}
+
+/* A press moves the control 1 px down instead of shrinking it, so the text never blurs. */
+.chip:active {
+  transform: translateY(1px);
 }
 
 /* aria-pressed is the source of truth, so the visual state can never disagree with what a
@@ -477,13 +621,15 @@ body {
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: rgba(4, 8, 16, 0.55);
   color: var(--text);
   cursor: pointer;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+  transition: background-color var(--dur-fast) linear, border-color var(--dur-fast) linear,
+              transform var(--dur-fast) var(--ease-out);
 }
 
 .icon-button svg {
@@ -493,6 +639,11 @@ body {
 
 .icon-button:hover {
   background: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-strong);
+}
+
+.icon-button:active {
+  transform: translateY(1px);
 }
 
 /* ---------- Ring gauges ---------- */
@@ -500,16 +651,17 @@ body {
 .gauge-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .gauge-card {
   min-width: 0;
-  padding: 12px 8px 11px;
-  border-radius: 13px;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.022);
   text-align: center;
+  transition: border-color var(--dur-base) linear, background-color var(--dur-base) linear;
 }
 
 .gauge-card.is-hot {
@@ -520,7 +672,7 @@ body {
 .gauge {
   display: block;
   width: 100%;
-  max-width: 118px;
+  max-width: 120px;
   margin: 0 auto;
 }
 
@@ -531,28 +683,31 @@ body {
 
 .gauge-arc {
   stroke-linecap: round;
-  /* Animating dashoffset is what makes the ring "fill" on first paint. */
-  transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Two transitions, two jobs: dashoffset is the ring filling, stroke is the colour moving
+     from green to amber to red as the zone crosses a threshold. Without the second one the
+     colour snaps while the ring glides, and the two disagree for 0.9 s. */
+  transition: stroke-dashoffset var(--dur-slow) var(--ease-out),
+              stroke var(--dur-base) linear;
 }
 
 .gauge-num {
   fill: var(--text);
-  font-size: 27px;
-  font-weight: 650;
+  font-size: var(--fs-2xl);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
 
 .gauge-cap {
   fill: var(--muted);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
 .gauge-name {
-  margin-top: 2px;
-  font-size: 11.5px;
+  margin-top: 4px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -561,8 +716,9 @@ body {
 }
 
 .gauge-dwell {
-  margin-top: 5px;
-  font-size: 10.5px;
+  margin-top: 4px;
+  font-size: var(--fs-2xs);
+  font-weight: 400;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -574,11 +730,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  margin-top: 6px;
+  margin-top: 8px;
   padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 9.5px;
-  font-weight: 700;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -589,6 +745,8 @@ body {
   height: 10px;
 }
 
+/* Each status is three signals at once: the word, the icon and the colour. Why: about one
+   man in twelve cannot separate red from green, so colour alone would be silent for them. */
 .status-chip.ok {
   color: #86efac;
   background: rgba(34, 197, 94, 0.14);
@@ -609,27 +767,27 @@ body {
 
 /* ---------- Alert log ---------- */
 
+/* The log scrolls inside its card, so a long history never pushes the page down. 336 px is
+   84 x 4: about six rows, which is enough to see a pattern without owning the screen. */
 .alert-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 4px 0 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  /* The log scrolls inside its card, so a long history never pushes the page down. */
-  max-height: 342px;
+  gap: 8px;
+  max-height: 336px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 3px;
 }
 
 .alert-row {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 9px 8px 12px;
-  border-radius: 11px;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.025);
   overflow: hidden;
@@ -654,16 +812,15 @@ body {
 .alert-sev.warn { background: var(--warn); }
 .alert-sev.ok { background: var(--ok); }
 
-/* Placeholder thumbnail: an empty frame with a faint image glyph, standing in for the
-   evidence JPEG that the real backend will serve. */
+/* The thumbnail: a real keyframe when one exists, an empty frame otherwise. */
 .alert-thumb {
   flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background:
-    linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(255, 255, 255, 0.02));
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(255, 255, 255, 0.02));
   display: grid;
   place-items: center;
   color: var(--muted);
@@ -680,6 +837,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .alert-main {
@@ -687,25 +845,26 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
 .alert-top {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
 .alert-time {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
+  font-weight: 400;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   flex: none;
 }
 
 .alert-zone {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -713,7 +872,8 @@ body {
 }
 
 .alert-meta {
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
+  font-weight: 400;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -724,10 +884,10 @@ body {
 .alert-tag {
   flex: none;
   margin-left: auto;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -749,10 +909,11 @@ body {
   display: grid;
   place-items: center;
   gap: 8px;
-  padding: 30px 12px;
+  padding: 32px 12px;
   text-align: center;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
+  font-weight: 400;
 }
 
 .empty-state svg {
@@ -766,7 +927,7 @@ body {
 .skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.055);
 }
 
@@ -785,9 +946,15 @@ body {
 }
 
 .skeleton-line { height: 10px; }
-.skeleton-value { height: 26px; width: 62%; }
-.skeleton-ring { height: 96px; width: 96px; border-radius: 999px; margin: 0 auto; }
-.skeleton-row { height: 46px; border-radius: 11px; }
+.skeleton-value { display: block; height: 26px; width: 62%; }
+.skeleton-ring { height: 96px; width: 96px; border-radius: var(--radius-pill); margin: 0 auto; }
+.skeleton-row { height: 48px; border-radius: var(--radius-md); }
+
+/* The short line under a gauge skeleton: centred, two thirds wide. */
+.skeleton-gauge-line {
+  width: 70%;
+  margin: 8px auto 0;
+}
 
 /* ---------- Live pill states ---------- */
 
@@ -828,15 +995,15 @@ body {
 .error-bar {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   margin-bottom: 12px;
-  padding: 8px 10px 8px 12px;
-  border-radius: 11px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(245, 158, 11, 0.34);
   background: rgba(245, 158, 11, 0.1);
   color: #fde68a;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--fs-sm);
+  font-weight: 400;
 }
 
 .error-bar[hidden] {
@@ -844,8 +1011,8 @@ body {
 }
 
 .error-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 
@@ -859,25 +1026,27 @@ body {
 .error-retry,
 .error-close {
   flex: none;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(253, 230, 138, 0.35);
   background: rgba(253, 230, 138, 0.12);
   color: #fde68a;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--dur-fast) linear, transform var(--dur-fast) var(--ease-out);
 }
 
 .error-retry {
-  padding: 3px 10px;
+  min-height: 28px;
+  padding: 4px 12px;
 }
 
 .error-close {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
+  font-size: var(--fs-lg);
   line-height: 1;
-  font-size: 15px;
 }
 
 .error-retry:hover,
@@ -885,34 +1054,56 @@ body {
   background: rgba(253, 230, 138, 0.22);
 }
 
+.error-retry:active,
+.error-close:active {
+  transform: translateY(1px);
+}
+
+/* ---------- Chart ---------- */
+
+/* The canvas needs a box with a height; Chart.js measures this element, not the canvas. */
+.chart-box {
+  position: relative;
+  height: 192px;
+}
+
+/* A legend key is a 16 px line sample: wide enough to read, too small to look like data. */
+.legend-swatch {
+  width: 16px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  display: inline-block;
+}
+
 /* ---------- Toast ---------- */
 
 /* Fixed to the bottom-right so a new alert can never shift the layout under the mouse. */
 .toast-stack {
   position: fixed;
-  right: 14px;
-  bottom: 14px;
+  right: 16px;
+  bottom: 16px;
   z-index: 60;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: min(340px, calc(100vw - 28px));
+  max-width: min(344px, calc(100vw - 32px));
   pointer-events: none;
 }
 
 .toast {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  padding: 10px 12px;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(239, 68, 68, 0.4);
   background: rgba(24, 12, 18, 0.94);
   box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--fs-sm);
+  font-weight: 400;
   pointer-events: auto;
-  animation: toast-in 0.22s ease-out;
+  animation: toast-in var(--dur-base) var(--ease-out);
 }
 
 .toast.is-leaving {
@@ -923,9 +1114,9 @@ body {
   flex: none;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
   background: rgba(239, 68, 68, 0.16);
   color: #fca5a5;
 }
@@ -940,16 +1131,17 @@ body {
 }
 
 .toast-title {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--fs-xs);
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #fca5a5;
 }
 
 .toast-text {
-  margin-top: 1px;
-  font-size: 12px;
+  margin-top: 2px;
+  font-size: var(--fs-sm);
+  font-weight: 400;
   color: var(--text);
   overflow-wrap: anywhere;
 }
@@ -961,7 +1153,7 @@ body {
 }
 
 @keyframes toast-out {
-  to { opacity: 0; transform: translateY(6px); }
+  to { opacity: 0; transform: translateY(8px); }
 }
 
 /* ---------- New-alert flash ---------- */
@@ -980,14 +1172,19 @@ body {
 
 /* The thumbnail becomes a real button only when there is a photo to open. */
 .alert-thumb.is-clickable {
-  padding: 0;
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.15s;
+  transition: border-color var(--dur-fast) linear, transform var(--dur-fast) var(--ease-out);
 }
 
-.alert-thumb.is-clickable:hover {
-  border-color: rgba(56, 189, 248, 0.5);
-  transform: scale(1.04);
+@media (hover: hover) and (pointer: fine) {
+  .alert-thumb.is-clickable:hover {
+    border-color: rgba(56, 189, 248, 0.5);
+    transform: scale(1.04);
+  }
+}
+
+.alert-thumb.is-clickable:active {
+  transform: scale(0.97);
 }
 
 /* ---------- Evidence modal ---------- */
@@ -1013,26 +1210,26 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
 }
 
 .evidence-title {
-  margin: 1px 0 0;
-  font-size: 14px;
+  margin: 2px 0 0;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 
 .evidence-body {
-  padding: 12px 14px 0;
+  padding: 12px 16px 0;
 }
 
 .evidence-body img {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: #04070f;
 }
@@ -1044,30 +1241,61 @@ body {
 
 .evidence-empty {
   margin: 0;
-  padding: 26px 10px;
+  padding: 24px 8px;
   text-align: center;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
+  font-weight: 400;
 }
 
 .evidence-meta {
-  padding: 10px 14px 14px;
-  font-size: 11.5px;
+  padding: 12px 16px 16px;
+  font-size: var(--fs-xs);
+  font-weight: 400;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Footer ---------- */
+
+.footer-status {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* The credit is the quietest text on the page: present for a panel that looks for it,
+   invisible to someone reading the numbers.
+
+   The 85% alpha is measured, not chosen by eye: at 72% the muted colour falls to 4.41:1
+   against the page, which fails WCAG AA for small text. At 85% it is 5.76:1 and still reads
+   as the quietest line on screen. The colour is declared twice so an older browser without
+   color-mix still gets a legible value instead of inheriting the body colour. */
+.footer-credit {
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: rgba(143, 163, 191, 0.85);
+  letter-spacing: 0.03em;
+}
+
+@supports (color: color-mix(in srgb, red 50%, transparent)) {
+  .footer-credit {
+    color: color-mix(in srgb, var(--muted) 85%, transparent);
+  }
+}
+
 /* ---------- Focus and scrollbars ---------- */
 
-/* A visible ring on keyboard focus only: mouse users never see it, keyboard users always do. */
+/* A visible ring on keyboard focus only: mouse users never see it, keyboard users always do.
+   Why no border-radius here: setting one would reshape whichever element received focus. */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .alert-list::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .alert-list::-webkit-scrollbar-track {
@@ -1076,7 +1304,7 @@ body {
 
 .alert-list::-webkit-scrollbar-thumb {
   background: rgba(143, 163, 191, 0.28);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .alert-list::-webkit-scrollbar-thumb:hover {
@@ -1085,25 +1313,37 @@ body {
 
 /* ---------- Responsive ---------- */
 
+/* At 360-420 px the ring is the only thing that can shrink without losing meaning. */
 @media (max-width: 420px) {
-  /* At 360-420 px the ring is the only thing that can shrink without losing meaning. */
   .gauge {
     max-width: 96px;
   }
 
+  .kpi-card {
+    padding: 12px;
+  }
+
   .kpi-value {
-    font-size: 25px;
+    font-size: var(--fs-2xl);
+  }
+
+  .kpi-label {
+    font-size: var(--fs-sm);
   }
 
   .gauge-num {
-    font-size: 24px;
+    font-size: var(--fs-2xl);
+  }
+
+  .gauge-grid {
+    gap: 4px;
   }
 
   /* The source picker is the widest flexible item in the bar. Capping it keeps the product
      name readable instead of letting the select squeeze it to one letter. */
   .source-select {
-    max-width: 132px;
-    padding-right: 26px;
+    max-width: 128px;
+    padding-right: 28px;
   }
 
   /* The clock is the least important item in the bar on a phone. Dropping it buys the space
@@ -1111,12 +1351,24 @@ body {
   #clock {
     display: none;
   }
+
+  .banner {
+    gap: 8px;
+    padding: 12px;
+    font-size: var(--fs-sm);
+  }
+
+  .toast-stack {
+    right: 8px;
+    bottom: 8px;
+    max-width: calc(100vw - 16px);
+  }
 }
 
 /* ---------- Reduced motion ---------- */
 
-/* Why: users who ask their OS for less motion get no pulsing, no shimmer and no ring sweep.
-   The ring still shows the correct value, it just appears instantly instead of animating. */
+/* Why: users who ask their OS for less motion get no pulsing, no shimmer, no slide and no
+   ring sweep. Every value is still correct; it simply appears instead of travelling. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1124,6 +1376,16 @@ body {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+
+  /* A transform is a movement even when it is instant, so hover lifts are cancelled outright. */
+  .glass:hover,
+  .alert-thumb.is-clickable:hover,
+  .chip:active,
+  .icon-button:active,
+  .error-retry:active,
+  .error-close:active {
+    transform: none;
   }
 
   .skeleton::after {
