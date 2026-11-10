@@ -13,3 +13,8 @@ assignment/
 
 # Internal agent working notes; not part of the submission.
 AGENTS.md
+
+# Scratch logs and PDF previews produced while checking the handbook layout.
+logs*.txt
+docs/_preview.pdf
+docs/_pg*.png
