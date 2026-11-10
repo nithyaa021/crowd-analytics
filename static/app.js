@@ -45,14 +45,22 @@ const FLASH_MS = 1600;
 /** Fetch timeouts. A hung request must not leave a panel on a skeleton forever. */
 const FETCH_TIMEOUT_MS = 8000;
 
-/** Radius of the gauge ring in SVG units; the stroke math below depends on it. */
-const GAUGE_RADIUS = 52;
-/** Circumference of that ring: 2 * PI * 52 ≈ 326.73 SVG units. */
-const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
+/**
+ * Size of the site plan's coordinate space, in the same pixels as a resized video frame.
+ *
+ * Why these exact numbers: zones.json stores polygons in the resized frame (config.FRAME_WIDTH
+ * wide), and every demo clip is 1280x720, so FRAME_WIDTH 640 x 360 is the grid the polygons are
+ * already expressed in. Using it directly means the plan and the video overlay can never drift.
+ *
+ * The plan zooms to the zones rather than showing the whole frame (see planViewBox), but these
+ * bounds still matter: they are the frame the polygons were drawn in, so a view can be checked
+ * against them and a viewer can be told what the unit is.
+ */
+const PLAN_WIDTH = 640;
+const PLAN_HEIGHT = 360;
 
-/** Colour per status, used for the gauge arc and the chart line of each zone. */
-const STATUS_STROKE = { OK: "var(--ok)", NEAR: "var(--warn)", OVER: "var(--crit)" };
-const ZONE_COLORS = ["#38bdf8", "#a78bfa", "#f472b6", "#34d399"];
+/** Colour per status, used by the plan outline and the chart line of each zone. */
+const ZONE_COLORS = ["#4c9aff", "#a78bfa", "#f472b6", "#3fb950"];
 
 /**
  * The dashboard's memory. Everything the screen needs that is not already in the DOM.
@@ -408,15 +416,19 @@ function renderKpis(snapshot) {
 }
 
 /* ---------------------------------------------------------------------------
- * 5. Zone gauges
+ * 5. Occupancy meters
  * ------------------------------------------------------------------------- */
 
 /**
- * Draws one SVG ring per zone and returns the markup as a string.
+ * Builds one occupancy row per zone: name, count against capacity, a fill bar and its stats.
+ *
+ * Why a bar and not a ring: capacity is a comparison against a limit, and a bar shows "how much
+ * of the limit" directly. Reading a fraction off a ring means estimating an angle, which nobody
+ * does accurately at a glance.
  *
  * Why a string builder separate from the DOM write: update() calls this twice a second. Building
- * the markup and assigning it once keeps the gauge structure identical between frames, so the
- * CSS transition on stroke-dashoffset animates instead of restarting from nothing.
+ * the markup and assigning it once keeps the row structure identical between frames, so the CSS
+ * transition on the bar's width animates instead of restarting from nothing.
  *
  * @param {Map<string, object>} latest - zone name -> the newest snapshot zone.
  * @returns {string} the inner HTML for #zone-gauges.
@@ -424,7 +436,7 @@ function renderKpis(snapshot) {
 function gaugeMarkup(latest) {
   return app.zoneDefs
     .map((definition) => {
-      // A zone with no snapshot yet (the first 0.5 s, or a clip that just changed) reads 0/…
+      // A zone with no snapshot yet (the first 0.5 s, or a feed that just changed) reads 0/…
       const live = latest.get(definition.name)
         || { count: 0, over_for: 0, avg_dwell: 0, avg_speed: 0 };
       const count = Number(live.count) || 0;
@@ -436,38 +448,38 @@ function gaugeMarkup(latest) {
       const rawFill = Number.isFinite(Number(live.fill)) && live.fill !== undefined
         ? Number(live.fill)
         : (capacity > 0 ? count / capacity : 0);
-      // Clip at 1: an over-capacity zone cannot fill more than a full ring, and the OVER chip
-      // already says the rest. Without the clip the dashoffset goes negative and the arc wraps
-      // around from the start, which looks like an empty ring.
+      // Clip at 1: the bar cannot be longer than its track, and the OVER chip already says the
+      // rest. Without the clip the width goes past 100% and the bar is cut off mid-shape.
       const fraction = Math.min(Math.max(rawFill, 0), 1);
-      const offset = GAUGE_CIRCUMFERENCE * (1 - fraction);
-      const isHot = status === "OVER" ? " is-hot" : "";
+
+      // One state class per status, so the row, the bar and the chip all agree. Why a map and not
+      // two ternaries: the CSS has a rule for each of the three states, and a state with no class
+      // silently keeps the OK styling, which is how the amber bar once rendered green.
+      const stateClass = { OVER: " is-hot", NEAR: " is-near" }[status] || "";
 
       return `
-        <div class="gauge-card${isHot}">
-          <svg class="gauge" viewBox="0 0 120 120" role="img"
-               aria-label="${escapeHtml(definition.name)}: ${count} of ${capacity} people, ${status}">
-            <!-- Rotate -90 deg so the ring starts at 12 o'clock instead of 3 o'clock. -->
-            <g transform="rotate(-90 60 60)">
-              <circle class="gauge-track" cx="60" cy="60" r="${GAUGE_RADIUS}"
-                      fill="none" stroke-width="9"></circle>
-              <circle class="gauge-arc" cx="60" cy="60" r="${GAUGE_RADIUS}"
-                      fill="none" stroke-width="9"
-                      stroke="${STATUS_STROKE[status] || STATUS_STROKE.OK}"
-                      stroke-dasharray="${GAUGE_CIRCUMFERENCE.toFixed(2)}"
-                      stroke-dashoffset="${offset.toFixed(2)}"></circle>
-            </g>
-            <text class="gauge-num" x="60" y="58" text-anchor="middle">${count}</text>
-            <text class="gauge-cap" x="60" y="76" text-anchor="middle">/ ${capacity}</text>
-          </svg>
-          <div class="gauge-name" title="${escapeHtml(definition.name)}">
-            ${escapeHtml(definition.name)}
+        <div class="zone-row${stateClass}">
+          <div class="zone-head">
+            <span class="zone-name" title="${escapeHtml(definition.name)}">
+              ${escapeHtml(definition.name)}
+            </span>
+            <span class="status-chip ${statusClass(status)}">
+              ${statusIcon(status)}${escapeHtml(status)}
+            </span>
           </div>
-          <span class="status-chip ${statusClass(status)}">
-            ${statusIcon(status)}${escapeHtml(status)}
-          </span>
-          <div class="gauge-dwell">avg ${formatDwell(live.avg_dwell)}</div>
-          <div class="gauge-speed">${formatSpeed(live.avg_speed)}</div>
+          <div class="zone-count tnum">
+            ${count}<span class="cap"> / ${capacity}</span>
+          </div>
+          <div class="zone-track">
+            <div class="zone-fill" style="width:${(fraction * 100).toFixed(1)}%"></div>
+          </div>
+          <div class="zone-meta">
+            <span>dwell ${formatDwell(live.avg_dwell)}</span>
+            <span>${formatSpeed(live.avg_speed)}</span>
+            ${status === "OVER" && Number(live.over_for) > 0
+              ? `<span style="color:var(--crit)">over ${Math.round(Number(live.over_for))} s</span>`
+              : ""}
+          </div>
         </div>`;
     })
     .join("");
@@ -517,7 +529,7 @@ function renderGauges(latest) {
         <span>No zones for this clip.</span>
       </div>`;
     summary.textContent = "none";
-    summary.style.color = "var(--muted)";
+    summary.style.color = "var(--ink-3)";
     return;
   }
 
@@ -535,6 +547,286 @@ function renderGauges(latest) {
   }).length;
   summary.textContent = overCount > 0 ? `${overCount}/${app.zoneDefs.length} over` : "all normal";
   summary.style.color = overCount > 0 ? "var(--crit)" : "var(--ok)";
+}
+
+/* ---------------------------------------------------------------------------
+ * 5b. Site plan
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Draws the zone polygons to scale, one dot per counted person, and the live fill shaded inside.
+ *
+ * Why this panel exists: the video already shows the overlay, but an operator needs the floor
+ * plan - the shape of the area they are responsible for, with the counts laid over it. It also
+ * makes the product read as a venue tool rather than a video player with numbers beside it.
+ *
+ * Why the SVG viewBox is the frame's pixel grid: polygons in zones.json are stored in resized
+ * frame pixels (640x360), so the coordinates go straight in with no scaling arithmetic and no
+ * chance of a rounding drift between the video overlay and the plan.
+ *
+ * The dots are spaced deterministically from the person's index, because the snapshot carries
+ * counts per zone rather than each person's position. That keeps the panel honest: it shows how
+ * many, distributed evenly inside the polygon, and never implies a position it was not given.
+ *
+ * @param {Map<string, object>} latest - zone name -> the newest snapshot zone.
+ */
+function renderPlan(latest) {
+  const container = document.getElementById("site-plan");
+  if (!container) {
+    return;
+  }
+
+  // A zone with no polygon cannot be drawn; fall back to a note rather than an empty box.
+  const drawable = app.zoneDefs.filter((zone) => Array.isArray(zone.polygon) && zone.polygon.length >= 3);
+  if (!drawable.length) {
+    container.innerHTML = '<div class="empty-state" style="height:100%">'
+      + "<span>No zone geometry for this feed.</span></div>";
+    return;
+  }
+
+  // Zoom the view to the zones themselves. Why: the polygons are stored in the whole 640x360
+  // frame, and a zone is typically a corner of it. Drawing the full frame would leave the plan
+  // as a small shape in a mostly empty box; framing the zones is what makes it read as a plan.
+  const view = planViewBox(drawable);
+
+  // The grid is drawn in frame units but sized from the zoom, so it keeps roughly even spacing
+  // however far the view is zoomed in.
+  const gridLines = [];
+  const step = view.width > 320 ? 80 : 40;
+  const firstX = Math.ceil(view.x / step) * step;
+  for (let x = firstX; x < view.x + view.width; x += step) {
+    gridLines.push(`<line x1="${x}" y1="${view.y}" x2="${x}" y2="${view.y + view.height}"></line>`);
+  }
+  const firstY = Math.ceil(view.y / step) * step;
+  for (let y = firstY; y < view.y + view.height; y += step) {
+    gridLines.push(`<line x1="${view.x}" y1="${y}" x2="${view.x + view.width}" y2="${y}"></line>`);
+  }
+
+  const shapes = drawable.map((zone) => {
+    const live = latest.get(zone.name) || { count: 0, capacity: 0 };
+    const count = Math.max(0, Number(live.count) || 0);
+    const capacity = Number(zone.capacity) || 0;
+    const status = live.status || deriveStatus(count, capacity);
+
+    // points="x1,y1 x2,y2 ..." is the SVG polygon format; it needs no path commands.
+    const points = zone.polygon
+      .map((pair) => `${Number(pair[0]) || 0},${Number(pair[1]) || 0}`)
+      .join(" ");
+
+    // People are drawn as dots placed inside the polygon, one per counted person. The placement
+    // checks the shape, so no dot can appear outside the area it is counting.
+    const dots = planDots(zone, count, capacity);
+
+    const shapeClass = status === "OVER" ? "plan-zone is-over"
+      : status === "NEAR" ? "plan-zone is-near"
+        : "plan-zone";
+
+    // The dot layer carries the same state as the outline, so an over-capacity zone turns its
+    // people red as well as its boundary. Both signals, one source.
+    const dotClass = shapeClass.replace("plan-zone", "plan-row");
+
+    return `
+      <polygon class="${shapeClass}" points="${points}"></polygon>
+      <g class="${dotClass}">
+        ${dots}
+      </g>`;
+  }).join("");
+
+  // A key in the corner, the way a real floor plan names its areas. Why not text on the shape:
+  // a zone is usually a narrow strip, and a name laid across it spills outside the boundary and
+  // becomes unreadable. A key is always legible and never depends on the shape's proportions.
+  const key = drawable.map((zone) => {
+    const live = latest.get(zone.name) || { count: 0, capacity: 0 };
+    const count = Math.max(0, Number(live.count) || 0);
+    const capacity = Number(zone.capacity) || 0;
+    const status = live.status || deriveStatus(count, capacity);
+    const swatch = status === "OVER" ? "var(--crit)" : status === "NEAR" ? "var(--warn)" : "var(--accent)";
+    return `
+      <div class="plan-key-row">
+        <span class="plan-key-swatch" style="background:${swatch}"></span>
+        <span class="plan-key-name" title="${escapeHtml(zone.name)}">${escapeHtml(zone.name)}</span>
+        <span class="plan-key-count">${count} / ${capacity}</span>
+      </div>`;
+  }).join("");
+
+  container.innerHTML = `
+    <svg viewBox="${view.x} ${view.y} ${view.width} ${view.height}"
+         preserveAspectRatio="xMidYMid meet"
+         role="img" aria-label="Site plan: ${escapeHtml(
+          drawable.map((zone) => {
+            const live = latest.get(zone.name) || { count: 0 };
+            return `${zone.name} ${Number(live.count) || 0} of ${zone.capacity}`;
+          }).join(", "),
+        )}">
+      <g class="site-plan-grid">${gridLines.join("")}</g>
+      ${shapes}
+    </svg>
+    <div class="plan-key">${key}</div>`;
+}
+
+/**
+ * Works out the viewBox that frames every zone with a small margin.
+ *
+ * Why not just use the full 640x360 frame: a zone is often a corner of the frame, so the plan
+ * would draw one small shape in a large empty box. Framing the zones is the difference between
+ * "a plan" and "a thumbnail of a camera image".
+ *
+ * The box is widened to 16:9 when needed, because a very tall or very wide zone would otherwise
+ * be letterboxed by preserveAspectRatio and leave gaps anyway.
+ *
+ * Example: a zone spanning x 284-488, y 232-359 becomes roughly a 244 x 152 box, padded to
+ * 292 x 164, so the zone fills most of the panel at any size.
+ *
+ * @param {Array<object>} zones - zone definitions that each carry a polygon.
+ * @returns {{x: number, y: number, width: number, height: number}} the viewBox.
+ */
+function planViewBox(zones) {
+  const boxes = zones.map((zone) => polygonBounds(zone.polygon));
+  const minX = Math.min(...boxes.map((b) => b.minX));
+  const minY = Math.min(...boxes.map((b) => b.minY));
+  const maxX = Math.max(...boxes.map((b) => b.maxX));
+  const maxY = Math.max(...boxes.map((b) => b.maxY));
+
+  // A margin of a fifth of the zone on each side: enough that the outline is not clipped by the
+  // panel edge, small enough that the zone still dominates the panel.
+  const padX = Math.max(12, (maxX - minX) * 0.18);
+  const padY = Math.max(12, (maxY - minY) * 0.18);
+
+  let width = (maxX - minX) + padX * 2;
+  let height = (maxY - minY) + padY * 2;
+  let x = minX - padX;
+  let y = minY - padY;
+
+  // Grow the shorter side to 16:9 and keep the centre, so the plan is never letterboxed.
+  const target = 16 / 9;
+  if (width / height < target) {
+    const wider = height * target;
+    x -= (wider - width) / 2;
+    width = wider;
+  } else {
+    const taller = width / target;
+    y -= (taller - height) / 2;
+    height = taller;
+  }
+
+  // Keep the view inside the frame the polygons were drawn in. A zone touching the frame edge
+  // would otherwise show blank space beyond the video, which reads as a drawing error.
+  x = Math.max(0, Math.min(x, PLAN_WIDTH - width));
+  y = Math.max(0, Math.min(y, PLAN_HEIGHT - height));
+  // A view wider than the frame cannot be clamped into it, so fall back to the whole frame.
+  if (width > PLAN_WIDTH || height > PLAN_HEIGHT) {
+    return { x: 0, y: 0, width: PLAN_WIDTH, height: PLAN_HEIGHT };
+  }
+
+  return { x, y, width, height };
+}
+
+/**
+ * Builds a spread of dots inside a zone, one per counted person.
+ *
+ * Why evenly spread and not at real positions: the WebSocket snapshot reports how many people
+ * are in a zone, not where each one stands. Spreading them evenly is the honest picture of
+ * "eight people in this area"; inventing positions would be a lie that looks like data.
+ *
+ * The positions follow a low-discrepancy walk (the golden-ratio step) so repeated counts do not
+ * stack into a visible grid pattern.
+ *
+ * @param {object} zone - one zone definition with its polygon and capacity.
+ * @param {number} count - how many people to draw.
+ * @param {number} capacity - the zone's capacity, used to size the dot spacing.
+ * @returns {string} the <circle> elements.
+ */
+function planDots(zone, count, capacity) {
+  const bounds = polygonBounds(zone.polygon);
+  const width = Math.max(1, bounds.maxX - bounds.minX);
+  const height = Math.max(1, bounds.maxY - bounds.minY);
+
+  // Never draw more than the capacity allows plus a few, so an absurd count cannot fill the
+  // panel with thousands of nodes and stall the page.
+  const total = Math.min(count, Math.max(8, capacity * 2));
+  if (!total) {
+    return "";
+  }
+
+  // Dot radius shrinks as the crowd grows, so a packed zone stays readable rather than blurring.
+  const radius = total > 24 ? 2.2 : total > 12 ? 2.9 : 3.6;
+  const circles = [];
+
+  // Walk a low-discrepancy sequence and keep only the points that land inside the polygon. Why
+  // the test: a zone is often a narrow strip, so most of its bounding box is outside it. Drawing
+  // the box and clipping to the shape silently loses most of the dots, which once made a zone of
+  // six people show two.
+  let attempts = 0;
+  let kept = 0;
+  const limit = total * 40 + 200;
+  while (kept < total && attempts < limit) {
+    // A golden-ratio walk gives well-spread points from a simple closed form.
+    const u = (attempts * 0.6180339887498949) % 1;
+    const v = (attempts * 0.3819660112501051 + 0.5) % 1;
+    attempts += 1;
+
+    const x = bounds.minX + (u * width);
+    const y = bounds.minY + (v * height);
+    if (!pointInPolygon(x, y, zone.polygon)) {
+      continue;
+    }
+    circles.push(`<circle class="plan-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${radius}"></circle>`);
+    kept += 1;
+  }
+
+  return circles.join("");
+}
+
+/**
+ * Says whether a point is inside a polygon, using the ray-casting rule.
+ *
+ * Why this is needed: the plan draws one dot per counted person, and dots must land inside the
+ * shape. A bounding-box test would put people outside a narrow or L-shaped zone, so the count on
+ * screen would disagree with the count in the key.
+ *
+ * The rule: cast a ray to the right and count how many edges it crosses. Odd means inside, even
+ * means outside. This works for any simple polygon, convex or not, so an L-shaped zone is fine.
+ *
+ * Example: the point (5, 5) against the square (0,0)-(10,0)-(10,10)-(0,10) crosses one edge, so
+ * it is inside; (15, 5) crosses none, so it is outside.
+ *
+ * @param {number} px - point x, in frame pixels.
+ * @param {number} py - point y, in frame pixels.
+ * @param {number[][]} polygon - list of [x, y] pairs, in order around the shape.
+ * @returns {boolean} true when the point lies inside.
+ */
+function pointInPolygon(px, py, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const xi = Number(polygon[i][0]) || 0;
+    const yi = Number(polygon[i][1]) || 0;
+    const xj = Number(polygon[j][0]) || 0;
+    const yj = Number(polygon[j][1]) || 0;
+
+    // Does the horizontal ray at py cross the edge from j to i?
+    const straddles = (yi > py) !== (yj > py);
+    if (straddles && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Returns the axis-aligned bounding box of a polygon, in frame pixels.
+ *
+ * @param {number[][]} polygon - list of [x, y] pairs.
+ * @returns {{minX: number, minY: number, maxX: number, maxY: number}} the bounds.
+ */
+function polygonBounds(polygon) {
+  const xs = polygon.map((pair) => Number(pair[0]) || 0);
+  const ys = polygon.map((pair) => Number(pair[1]) || 0);
+  return {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+  };
 }
 
 /* ---------------------------------------------------------------------------
@@ -747,8 +1039,8 @@ function createChart() {
 
   // A vertical gradient makes the fill read as "volume" rather than a flat block of colour.
   const gradient = context.createLinearGradient(0, 0, 0, 190);
-  gradient.addColorStop(0, "rgba(56, 189, 248, 0.34)");
-  gradient.addColorStop(1, "rgba(56, 189, 248, 0.02)");
+  gradient.addColorStop(0, "rgba(76, 154, 255, 0.26)");
+  gradient.addColorStop(1, "rgba(76, 154, 255, 0.01)");
 
   const zoneDatasets = app.zoneDefs.map((definition, index) => ({
     label: definition.name,
@@ -770,7 +1062,7 @@ function createChart() {
         {
           label: "Total",
           data: [],
-          borderColor: "#38bdf8",
+          borderColor: "#4c9aff",
           backgroundColor: gradient,
           borderWidth: 2,
           fill: true,
@@ -778,13 +1070,13 @@ function createChart() {
           // No dots: 120 of them would look like a scatter plot, not a trend.
           pointRadius: 0,
           pointHoverRadius: 4,
-          pointHoverBackgroundColor: "#38bdf8",
+          pointHoverBackgroundColor: "#4c9aff",
         },
         ...zoneDatasets,
         {
           label: "Capacity",
           data: [],
-          borderColor: "#ef4444",
+          borderColor: "#f05252",
           borderWidth: 1.5,
           borderDash: [5, 4],
           fill: false,
@@ -800,20 +1092,25 @@ function createChart() {
       interaction: { intersect: false, mode: "index" },
       scales: {
         x: {
-          grid: { color: "rgba(255,255,255,0.04)", drawTicks: false },
+          grid: { color: "rgba(255,255,255,0.035)", drawTicks: false },
           border: { display: false },
           ticks: {
-            color: "#8fa3bf",
-            font: { size: 10 },
+            color: "#78859a",
+            font: { size: 10, family: "ui-monospace, Consolas, monospace" },
             maxTicksLimit: 6,
             maxRotation: 0,
           },
         },
         y: {
           beginAtZero: true,
-          grid: { color: "rgba(255,255,255,0.05)", drawTicks: false },
+          grid: { color: "rgba(255,255,255,0.04)", drawTicks: false },
           border: { display: false },
-          ticks: { color: "#8fa3bf", font: { size: 10 }, precision: 0, maxTicksLimit: 5 },
+          ticks: {
+            color: "#78859a",
+            font: { size: 10, family: "ui-monospace, Consolas, monospace" },
+            precision: 0,
+            maxTicksLimit: 5,
+          },
         },
       },
     },
@@ -1274,6 +1571,7 @@ function update(snapshot) {
 
   renderKpis(snapshot);
   renderGauges(app.latestZones);
+  renderPlan(app.latestZones);
 
   // The banner is driven by alerts_active, per the brief, and names the worst over-capacity
   // zone when one exists. A cleared-alert frame hides it even if a zone is still near capacity.
@@ -1468,6 +1766,7 @@ async function changeSource(name) {
     });
     rebuildChart();
     renderGauges(app.latestZones);
+    renderPlan(app.latestZones);
     document.getElementById("chart-window").textContent = "waiting for the first samples";
 
     // Restart the stream so the browser does not keep showing the previous clip's last frame.
@@ -1504,6 +1803,9 @@ async function loadZones(source = null) {
   return (Array.isArray(zones) ? zones : []).map((zone) => ({
     name: String(zone.name),
     capacity: Number(zone.capacity) || 0,
+    // The polygon is kept so the site-plan panel can draw the same shape the engine uses. It is
+    // optional: every other consumer works from name and capacity alone.
+    polygon: Array.isArray(zone.polygon) ? zone.polygon : [],
   }));
 }
 
@@ -1570,6 +1872,7 @@ async function loadInitialData() {
     app.zoneDefs = zoneRows.map((zone) => ({
       name: String(zone.name),
       capacity: Number(zone.capacity) || 0,
+      polygon: Array.isArray(zone.polygon) ? zone.polygon : [],
     }));
   }
 
@@ -1636,13 +1939,13 @@ async function retryInitialLoad() {
  * says "working" without inventing numbers.
  */
 function showSkeletons() {
-  // Two skeleton gauge cards, built as one string so the markup cannot drift between them.
-  const gaugeCard = `
-    <div class="gauge-card">
-      <div class="skeleton skeleton-ring"></div>
-      <div class="skeleton skeleton-line skeleton-gauge-line"></div>
+  // One skeleton meter, built as a string so the markup cannot drift between rows.
+  const zoneRow = `
+    <div class="zone-row">
+      <div class="skeleton skeleton-line" style="width:50%"></div>
+      <div class="skeleton skeleton-ring" style="margin-top:7px"></div>
     </div>`;
-  document.getElementById("zone-gauges").innerHTML = gaugeCard + gaugeCard;
+  document.getElementById("zone-gauges").innerHTML = zoneRow + zoneRow;
 
   // Three rows is about one screenful of a scrolling log: enough to show the shape of it.
   const alertRow = '<li><div class="skeleton skeleton-row"></div></li>';

@@ -36,7 +36,7 @@ Three sentences if you are very short on time:
 
 - **Track A** of the brief: crowd density and bottleneck analytics.
 - **Stack**: Python + YOLOv8n/ByteTrack (ultralytics) + OpenCV + FastAPI + SQLite, plain HTML/Tailwind/Chart.js.
-- **Result**: live annotated video, zone gauges, headcount chart, congestion banner, and a saved alert history with evidence photos.
+- **Result**: live annotated video, occupancy meters, a site plan, a headcount chart, a congestion banner, and a saved alert history with evidence photos.
 
 ---
 
@@ -78,7 +78,7 @@ data flow.**
 │  LAYER 4 — WEB DASHBOARD             (static/index.html,        │
 │                                        app.js, style.css)       │
 │  Live video with boxes + zones + heatmap                        │
-│  4 KPI tiles, zone gauges, headcount chart, alert log           │
+│  readings strip, camera, chart, meters, site plan, log         │
 │  Congestion banner, toast, evidence photo modal                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -174,8 +174,8 @@ crowd-analytics/
 │   └── main.py         ← FastAPI routes (the web layer)
 ├── static/
 │   ├── index.html      ← the dashboard markup
-│   ├── app.js          ← fetches data, draws gauges/chart/alerts
-│   └── style.css       ← the dark command-centre theme
+│   ├── app.js          ← fetches data, draws meters/plan/chart/alerts
+│   └── style.css       ← the operations console theme
 ├── tests/
 │   └── test_pipeline.py ← 20 tests, one per important rule
 ├── zones.json          ← zone polygons + capacities per clip
@@ -340,7 +340,7 @@ return "OK"
 ```
 
 **One rule, three callers:** the video colour, the API value and the test all use it, so the
-gauge can never say "OK" while the alert says "over".
+meter can never say "OK" while the alert says "over".
 
 > Example with capacity 10: 7 → OK, 8 → NEAR, 10 → NEAR, 11 → OVER.
 >
@@ -677,7 +677,7 @@ Assembles the exact dict the browser receives:
 FastAPI would raise when `np.int64(7)` reached the encoder.
 
 **Why `fill` is computed here and not in the browser:** it is computed next to `status`, so the
-gauge ring and the status chip can never disagree.
+occupancy bar and the status chip can never disagree.
 
 ### `render(boxes, zones_on, heat)` — the video path
 
@@ -732,7 +732,7 @@ die with the application. FastAPI's `lifespan` is exactly that scope.
 | `GET /` | `static/index.html` | the dashboard |
 | `GET /video?boxes=1&zones=1&heat=0` | MJPEG stream | live annotated video |
 | `WS /ws` | snapshot JSON every 0.5 s | live numbers |
-| `GET /api/zones?source=` | zone polygons + capacities | so the browser can draw gauges before data arrives |
+| `GET /api/zones?source=` | zone polygons + capacities | so the browser can draw the meters and the site plan before data arrives |
 | `GET /api/alerts?limit=` | newest alerts | the alert feed |
 | `GET /api/history?minutes=` | headcount samples, oldest first | the line chart |
 | `GET /api/sources` | clip names | the source picker |
@@ -777,19 +777,23 @@ missing page. 400 tells the client "fix your body".
 
 ## 4.8 `static/index.html` — the dashboard markup
 
-Plain HTML with Tailwind utility classes. No build step, no framework. Seven regions, top to
+Plain HTML with Tailwind utility classes. No build step, no framework. Eight regions, top to
 bottom:
 
 1. **Sticky top bar** — logo, title, source picker (filled from `/api/sources`), LIVE pill
    (reports the **WebSocket** state, not the engine's), FPS, clock.
 2. **Inline error bar** — one line, only when a fetch fails or the socket drops.
 3. **Congestion banner** — visible only while `alerts_active > 0`.
-4. **KPI row** — 2×2 on phones, 4 across from 1024 px:
-   *People now* · *Peak (session)* · *Average dwell* · *Processing FPS*.
-5. **Main grid** — left 8/12: video card + headcount chart. Right 4/12: zone gauges + alert log.
+4. **Readings strip** — one bordered strip of four cells, 2x2 on phones and 4 across from
+   1024 px: *People now* · *Peak this session* · *Avg dwell* · *Throughput*.
+5. **Console grid** — left 8/12: camera panel + headcount trend. Right 4/12: occupancy meters,
+   site plan, event log.
 6. **Footer** — live status and the credit line.
 7. **Toast + evidence `<dialog>`** — a new alert announces itself; clicking an alert opens the
    saved photo.
+
+**Why a readings strip and not four cards:** four separate floating boxes compete with the video
+for attention, and a strip takes about half the vertical space for the same four numbers.
 
 **Why a `<dialog>` for evidence:** the browser gives focus trapping, Escape-to-close and an
 inert backdrop for free, which is exactly the accessibility behaviour a hand-rolled modal would
@@ -802,40 +806,56 @@ library, and they open **downward** so they clear the sticky header.
 
 ## 4.9 `static/app.js` — the browser logic
 
-About 1,740 lines, organised in numbered sections. You do not need every line; you need the
-**seven jobs**.
+About 1,900 lines, organised in numbered sections. You do not need every line; you need the
+**eight jobs**.
 
 | Section | Job |
 | --- | --- |
 | 1. Helpers | `escapeHtml`, `statusClass`, `formatDwell`, **`formatSpeed`**, `videoLabel`, `clockTime` |
 | 2. Fetching | `getJson`, `showError`, `clearError` |
 | 3. KPIs | `animateKpi`, `renderKpis` |
-| 4. Gauges | `gaugeMarkup`, `deriveStatus`, `renderGauges` |
-| 5. Alerts | `normaliseAlert`, `alertRowMarkup`, `renderAlerts`, `prependAlert` |
-| 6. Chart | `createChart`, `pushChartData`, `appendChartPoint`, `prefillChart`, `rebuildChart` |
-| 7. Live wiring | `connectSocket`, `scheduleReconnect`, `update`, `videoUrl`, `bindToggle` |
-| 8. Actions | `showToast`, `openEvidence`, `changeSource`, `loadInitialData`, `boot` |
+| 4. Occupancy meters | `gaugeMarkup`, `deriveStatus`, `renderGauges` |
+| 5. Site plan | `renderPlan`, `planViewBox`, `planDots`, `pointInPolygon`, `polygonBounds` |
+| 6. Alerts | `normaliseAlert`, `alertRowMarkup`, `renderAlerts`, `prependAlert` |
+| 7. Chart | `createChart`, `pushChartData`, `appendChartPoint`, `prefillChart`, `rebuildChart` |
+| 8. Live wiring | `connectSocket`, `scheduleReconnect`, `update`, `videoUrl`, `bindToggle` |
+| 9. Actions | `showToast`, `openEvidence`, `changeSource`, `loadInitialData`, `boot` |
 
 ### The functions most likely to be asked about
 
 **`update(snapshot)`** — the single entry point for live data. It calls `renderKpis`,
-`renderGauges`, `pushChartData`, `renderBanner`, `reconcileActiveAlerts` and, if
+`renderGauges`, `renderPlan`, `pushChartData`, `renderBanner`, `reconcileActiveAlerts` and, if
 `snapshot.new_alert` is set, `prependAlert` + `showToast`.
 
-**`gaugeMarkup(latest)`** — builds **one SVG ring per zone**. The ring is a `<circle>` with
-`stroke-dasharray` equal to the circumference and `stroke-dashoffset` set to
-`circumference × (1 − fill)`. Animating `stroke-dashoffset` via CSS gives a smooth sweep.
+**`gaugeMarkup(latest)`** — builds **one occupancy row per zone**: the name, the status chip, the
+count against capacity, and a fill bar whose width is the fill ratio, plus the dwell and speed
+beneath it.
 
-> Example: radius 52 → circumference `2π×52 ≈ 326.7`. At 75% full, offset = `326.7 × 0.25 ≈ 81.7`,
-> so 245 px of the ring is drawn.
+> Example: 3 people against capacity 4 gives fill 0.75, so the bar is `75%` wide and the chip
+> reads OK. At 4 it reads NEAR and the bar turns amber; at 5 it reads OVER and turns red.
 
-**Why the fill is clamped to [0, 1]:** an over-capacity zone cannot fill more than a full ring.
-Without the clamp the offset goes negative and the arc wraps around, which looks like an *empty*
-ring — the opposite of the truth.
+**Why a bar and not a ring:** capacity is a comparison against a limit, and a bar shows how much
+of the limit is used directly. Reading a fraction off a ring means estimating an angle.
+
+**Why the fill is clamped to [0, 1]:** an over-capacity zone cannot fill more than its track.
+Without the clamp the width goes past 100% and the bar is cut off mid-shape.
 
 **Why the snapshot's own `fill` is preferred:** it is computed next to `status` on the server, so
-the ring and the chip can never disagree. `count / capacity` is only the first-half-second
+the bar and the chip can never disagree. `count / capacity` is only the first-half-second
 fallback.
+
+**`renderPlan(latest)`** — draws the zone polygons from `/api/zones`, one dot per counted person,
+with the outline and the dots coloured by status. It is the panel that makes the page read as a
+venue tool: an operator recognises the shape of their own area.
+
+**`planViewBox(zones)`** — works out the SVG `viewBox` that frames every zone with a margin, then
+widens it to 16:9 so nothing is letterboxed. The polygons are stored in the whole 640x360 frame,
+and a zone is often one corner of it; without this zoom the plan would be a small shape in a
+mostly empty box.
+
+**`planDots(zone, count, capacity)`** — places the dots. It walks a low-discrepancy sequence and
+keeps only the points `pointInPolygon` confirms are inside the shape. Drawing the bounding box and
+clipping instead silently lost most of the dots, which once made a zone of six people show two.
 
 **`deriveStatus(count, capacity)`** — mirrors `status_for` in Python, for the half second before
 the first snapshot arrives. The `0.8` is repeated on purpose and the comment says so.
@@ -859,27 +879,33 @@ reloads.
 
 ## 4.10 `static/style.css` — the theme
 
-About 1,410 lines of CSS on top of Tailwind. What is actually worth explaining:
+About 1,620 lines of CSS on top of Tailwind. What is actually worth explaining:
 
-- **Design tokens** — all colours, radii, font sizes and shadows are CSS custom properties
-  (`--bg`, `--panel`, `--text`, `--muted`, `--ok`, `--warn`, `--crit`). One place to change the
-  whole theme.
-- **`.glass`** — the card surface: translucent background, 1 px hairline border, soft shadow,
-  `backdrop-filter` blur. It is what makes the dashboard read as a "command centre" rather than
-  a spreadsheet.
-- **`.tnum`** — `font-variant-numeric: tabular-nums`. Without it, changing `7` to `11` shifts the
-  layout sideways; with it, digits have equal width and numbers stay put.
+- **Design tokens** — all colours, radii, font sizes and motion timings are CSS custom properties
+  (`--bg`, `--panel`, `--panel-2`, `--rule`, `--ink`, `--ink-2`, `--ink-3`, `--ok`, `--warn`,
+  `--crit`, `--accent`). One place to change the whole theme.
+- **`.glass`** — the panel surface, kept under its old class name so no JavaScript changed: a flat
+  fill, one hairline border, a 4 px radius, and **no shadow and no blur**. A console is read
+  straight on; a soft shadow implies a card floating over something, and on a dim projector it
+  turns to mud.
+- **`.tnum` and `.mono`** — `font-variant-numeric: tabular-nums`, and a monospace stack for every
+  number that changes. Without tabular figures, changing `7` to `11` shifts the layout sideways.
 - **`.status-chip`** — the OK / NEAR / OVER pill, with a matching outline icon so the meaning is
   not carried by colour alone (important for colour-blind users).
-- **`.gauge-*`** — the SVG ring, the number, the `/ capacity` label, the dwell line and the new
-  speed line.
+- **`.zone-row` / `.zone-track` / `.zone-fill`** — the occupancy meter: a name and status line, the
+  count against capacity, and a fill bar. A row in the NEAR state gets an amber marker and an amber
+  bar; OVER gets red and a red bar. Both states also change the bar colour, so the row never shows
+  a green bar beside an amber chip.
+- **`.site-plan` / `.plan-zone` / `.plan-key`** — the SVG floor plan, its status-coloured outline,
+  and the corner key that names each zone.
 - **Reduced motion** — a `prefers-reduced-motion` block turns off the non-essential transitions.
 - **Vendored assets** — Tailwind and Chart.js are checked into `static/vendor/` so the demo runs
   with the network cable unplugged. There is no CDN call and no build step.
 
-**Contrast was measured, not guessed:** the muted text colour is `#8FA3BF`, which is **7.03:1**
-against the panel background (WCAG AA needs 4.5:1 for body text), and the footer credit was
-raised to **5.76:1**.
+**Contrast was measured, not guessed.** Against the panel `#12161e`: body ink `#e8edf4` is
+**15.4:1**, secondary ink `#a2aec0` is **8.1:1**, and the dimmest text `#78859a` is **4.9:1**
+(WCAG AA needs 4.5:1 for body text, AAA needs 7:1). The state inks pass comfortably: green
+**11.8:1**, amber **9.3:1**, red **8.3:1**.
 
 ---
 
@@ -955,7 +981,7 @@ Panel members like concrete arithmetic. These are the ones that actually appear.
 ### Counts and fill
 
 - Zone capacity 4, 7 people inside → `fill = 7 / 4 = 1.75`, status **OVER**.
-- The gauge ring is clamped to `1.0`, so it draws a **full** ring; the OVER chip communicates
+- The occupancy bar is clamped to `1.0`, so it fills its **whole** track; the OVER chip communicates
   the excess.
 - 3 people in a capacity-4 zone → `fill = 0.75`, and `0.75 < 0.8` → **OK**.
 - 4 people in a capacity-4 zone → `fill = 1.0`, `4 >= 0.8×4` → **NEAR**, not OVER.
@@ -1093,7 +1119,7 @@ Say these plainly — honesty scores well:
 
 ### 14. Why does the dashboard show "NEAR" at 80%?
 
-So an operator gets a warning *before* the area is actually full. A gauge that is silent until
+So an operator gets a warning *before* the area is actually full. A meter that is silent until
 100% gives no time to react.
 
 ---
@@ -1108,7 +1134,7 @@ Track A, "Crowd density and bottleneck analytics" (slide 5):
 | **02 Density and flow** — density heatmaps and estimated movement velocity | `analytics.py` | `HeatmapAccumulator`; `SpeedTracker` (px/s) |
 | **03 Dwell and thresholds** — measure dwell, alert when a zone exceeds capacity | `analytics.py`, `engine.py` | `DwellTracker`; `AlertDebouncer` + `status_for` |
 | **Live video** — density heatmaps and bounding boxes | `engine.render` | boxes, foot dots, zone polygons, masked heat overlay |
-| **Capacity and headcount** — zone gauges and headcount time-series charts | `index.html`, `app.js`, `db.py` | SVG ring gauges; Chart.js line chart fed from `headcount` |
+| **Capacity and headcount** — occupancy meters, site plan and headcount time-series charts | `index.html`, `app.js`, `db.py` | Occupancy bars plus an SVG site plan; Chart.js line chart fed from `headcount` |
 | **Congestion warnings** — visible banners when thresholds trigger | `index.html`, `app.js` | banner driven by `alerts_active`; toast on `new_alert` |
 
 Architecture (slide 16) — the four layers are exactly what Part 2 shows:
@@ -1116,7 +1142,7 @@ image/video input → vision and rules → backend and storage → web dashboard
 "REST for history, WebSockets for events" and MJPEG for video.
 
 Front-end experience (slide 17): live visual feedback (counters, banner, toast), operator
-context (chart, gauges, severity chips, evidence snapshots), responsive controls (overlay
+context (chart, meters, site plan, severity chips, evidence snapshots), responsive controls (overlay
 toggles, fullscreen, source picker).
 
 Demo data and validation (slide 19): three clips at three different densities, in
@@ -1133,7 +1159,7 @@ Evaluation rubric (slide 20) - and how this maps:
 
 | Criterion | Weight | How this project targets it |
 | --- | --- | --- |
-| **Front-end UI/UX richness** | **60%** | Dark command-centre theme, animated KPIs, SVG ring gauges, Chart.js line chart with a capacity line, congestion banner, toast, evidence modal, full keyboard/ARIA support, responsive from 360 px |
+| **Front-end UI/UX richness** | **60%** | Operations-console theme (flat surfaces, hairline rules, state-only colour), readings strip, occupancy meters, an SVG site plan drawn from the real zone polygons, Chart.js line chart with a capacity line, congestion banner, toast, evidence modal, full keyboard/ARIA support, responsive from 360 px |
 | Vision pipeline and accuracy | 20% | YOLOv8n + ByteTrack, tuned `conf`, `STRIDE`, honest measured accuracy + documented limitations |
 | Custom demo and realism | 10% | Three clips at three densities (Pexels stock footage, credited in SOURCES.csv), documented expected results, evidence photos |
 | System architecture and scope | 10% | Four clean layers, config module, single-file DB module, thin web layer, 20 tests |
@@ -1146,16 +1172,16 @@ Evaluation rubric (slide 20) - and how this maps:
 The browser loads `index.html`, calls `/api/sources`, `/api/zones`, `/api/history` and
 `/api/alerts`, then opens `/ws` and sets the `<img>` source to `/video`. Meanwhile the engine
 thread is already looping over the clip. Every 0.5 s the WebSocket pushes a snapshot; the JS
-re-renders the KPIs, gauges and chart. The `<img>` receives a new JPEG up to 15 times a second.
+re-renders the readings strip, the meters, the site plan and the chart. The `<img>` receives a new JPEG up to 15 times a second.
 
 **"Where does the number 7 on the KPI tile come from?"**
 `count_by_zone` counted feet inside zones in the newest analysed frame; `_build_snapshot` summed
 those counts into `total_people`; `SharedState` published it; `/ws` sent it; `renderKpis` wrote it
 into `[data-kpi="people"]`.
 
-**"Why does a zone show OVER but the ring is full, not overflowing?"**
-`fill` is `count / capacity` (e.g. `7/4 = 1.75`), and the client clamps it to 1.0 so the SVG
-dash-offset never goes negative and wrap the arc. The OVER chip carries the excess information.
+**"Why does a zone show OVER but the bar is full, not overflowing?"**
+`fill` is `count / capacity` (e.g. `7/4 = 1.75`), and the client clamps it to 1.0 so the bar never
+extends past its track. The OVER chip and the "over 3 s" note carry the excess information.
 
 **"Why is the alert saved twice — once in memory and once in SQLite?"**
 The DB is the durable record for the **history**. The in-memory `active_alerts` dict is the
@@ -1225,15 +1251,18 @@ Expected: `Ran 20 tests ... OK`.
 1. **Open the page on `crowded.mp4`.** Point at the video: "boxes are detections, the coloured
    polygon is the monitored zone with its live count, and the heat colours show where people
    keep standing."
-2. **Point at the four KPIs.** "People now, peak this session, average dwell, and actual
+2. **Point at the readings strip.** "People now, peak this session, average dwell, and actual
    processing FPS on this machine."
-3. **Wait for the alert.** The banner appears and a toast announces it. "That fired because the
+3. **Show the site plan.** "The same zone polygon as on the video, drawn to scale from
+   `zones.json`, with one dot per counted person. It turns amber at 80% of capacity and solid red
+   when over."
+4. **Wait for the alert.** The banner appears and a toast announces it. "That fired because the
    zone was over capacity for 3 continuous seconds — a single frame would not have triggered it."
-4. **Show the zone gauge.** "The ring is the fill ratio; the chip says OVER; below it is average
-   dwell and average movement speed."
-5. **Click the alert.** The evidence photo opens — the frame that caused it, with boxes and
+5. **Show the occupancy meter.** "The bar is the fill ratio; the chip says OVER; below it is
+   average dwell and average movement speed."
+6. **Click the alert.** The evidence photo opens — the frame that caused it, with boxes and
    zones drawn in.
-6. **Switch to `normal.mp4`.** "Same pipeline, low density — no alert, which is the
+7. **Switch to `normal.mp4`.** "Same pipeline, low density — no alert, which is the
    false-positive check."
-7. **End on the chart.** "This is the headcount over time, with the capacity line drawn across
+8. **End on the chart.** "This is the headcount over time, with the capacity line drawn across
    it."

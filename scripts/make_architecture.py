@@ -226,8 +226,9 @@ def main() -> None:
 
     y = layer_card(draw, y, "4", "WEB DASHBOARD",
                    ["static/index.html", "static/app.js", "static/style.css"],
-                   "Live video with bounding boxes, zone polygons and the density heatmap. Four "
-                   "KPI tiles, ring gauges per zone, a headcount chart and the congestion banner.",
+                   "Live video with bounding boxes, zone polygons and the density heatmap. A "
+                   "readings strip, occupancy meters per zone, a site plan, a headcount chart and "
+                   "the congestion banner.",
                    PURPLE)
 
     thread_strip(draw, y + 34)

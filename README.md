@@ -26,9 +26,40 @@ Three questions, answered continuously:
 3. **Is any zone over capacity?** — a debounced rule fires an alert only after a zone has been
    over capacity for 3 continuous seconds, saves an evidence photo, and shows a banner.
 
-The dashboard shows the annotated video (boxes, zone polygons, density heatmap), four KPI tiles,
-SVG ring gauges per zone, a headcount time series, and an alert log with clickable evidence
-photos.
+The dashboard shows the annotated video (boxes, zone polygons, density heatmap), a readings strip
+of four live figures, an occupancy meter per zone, a site plan drawn from the real zone polygons, a
+headcount time series, and an alert log with clickable evidence photos.
+
+---
+
+## How this meets Track A
+
+The brief (Cogno Valley, Vision AI Internship Projects, Track A: *Crowd density and bottleneck
+analytics — monitor density, occupancy and congestion*) lists three build items and three dashboard
+requirements. Each one maps to a specific part of this app.
+
+| Brief requirement | Where it lives | What you see |
+| --- | --- | --- |
+| **01 People and occupancy** — detect and track people, count occupancy within configured zones | `vision.py`, `zones.py` | Boxes on the video; the count per zone in the occupancy meters and on the site plan |
+| **02 Density and flow** — density heatmaps and movement velocity | `analytics.py` (`HeatmapAccumulator`, `SpeedTracker`) | The Heatmap overlay chip; `px/s` under each zone |
+| **03 Dwell and thresholds** — measure dwell, alert when a zone exceeds capacity | `analytics.py` (`DwellTracker`, `AlertDebouncer`) | `Avg dwell` in the readings strip; the congestion banner and event log |
+| **Live video** — density heatmaps and bounding boxes | `engine.render` | The camera panel, with the Boxes / Zones / Heatmap toggles |
+| **Capacity and headcount** — zone gauges and headcount time-series charts | `static/app.js` | The occupancy meters and the headcount trend chart with its capacity line |
+| **Congestion warnings** — visible banners when thresholds trigger | `static/app.js` | The red banner, the toast, and the `ACTIVE` row in the event log |
+
+The demo follows the brief's own demo example: a corridor fills beyond its configured capacity, and
+the live count, the heatmap and the congestion warning update together.
+
+### Submission checklist
+
+| Item | Status |
+| --- | --- |
+| **01 GitHub repository** — frontend, backend and vision engine, with a clear README and an architecture diagram | This repo; the diagram is above and in `docs/architecture.png` |
+| **02 Demo image/video dataset** — the media used, plus expected results | `demo_videos/` with `SOURCES.csv` (origin, author, licence) and `expected_results.md` (predicted alerts per clip) |
+| **03 Live walkthrough** — run the dashboard and demonstrate the workflow | `.\start.bat`, then follow the 3-minute script in the handbook |
+
+Per the brief, open-source footage is acceptable in place of self-recorded video; the clips are
+Pexels stock and `SOURCES.csv` records the provenance.
 
 ---
 
@@ -62,11 +93,11 @@ LAYER 3 — BACKEND AND STORAGE                   app/engine.py, db.py, main.py
                               v
 LAYER 4 — WEB DASHBOARD                         static/index.html, app.js, style.css
   Live video with boxes, zones and heatmap
-  4 KPI tiles, zone gauges, headcount chart, alert log
+  Readings strip, occupancy meters, site plan, chart, event log
   Congestion banner, toast, evidence modal
 ```
 
-**The key idea:** reading a frame and running the model takes 60–110 ms, but a browser asking for
+**The key idea:** reading a frame and running the model takes 60-110 ms, but a browser asking for
 numbers must be answered in microseconds. So two threads exist — the **engine** does the slow work
 and publishes its latest result, and the **web** thread only reads that result. They meet at
 `SharedState`, guarded by one lock. No request ever waits for the model.
@@ -75,7 +106,7 @@ and publishes its latest result, and the **web** thread only reads that result. 
 
 ## Quick start
 
-Requires **Python 3.10–3.12** (3.13 is not supported by the pinned dependencies).
+Requires **Python 3.10-3.12** (3.13 is not supported by the pinned dependencies).
 
 ```powershell
 cd C:\Users\akshaya\Downloads\crowd-analytics
@@ -140,8 +171,8 @@ crowd-analytics/
 │   └── main.py          FastAPI routes (the whole web layer)
 ├── static/
 │   ├── index.html       dashboard markup
-│   ├── app.js           fetches data, draws gauges, chart and alerts
-│   ├── style.css        dark command-centre theme
+│   ├── app.js           fetches data, draws meters, plan, chart and alerts
+│   ├── style.css        operations console theme
 │   └── vendor/          Tailwind + Chart.js, so the layout and charts need no CDN
 ├── tests/
 │   └── test_pipeline.py 20 tests, ordered person -> zone -> analytics -> db
@@ -211,8 +242,8 @@ own polygon. Coordinates are in the 640-wide resized frame, which is the frame t
 On the target laptop — 11th Gen Intel i3-1125G4, 4 physical cores, no GPU:
 
 - **~16 fps** sustained processing (crowded / mid / normal: 16.6 / 16.1 / 15.9 fps)
-- `detect + track` is about **78–79%** of each frame's cost
-- p95 frame time **79–86 ms**
+- `detect + track` is about **78-79%** of each frame's cost
+- p95 frame time **79-86 ms**
 - To keep up with `STRIDE 2` at 29.97 fps source, 14.98 fps is needed — so all three clips run
   faster than real-time-equivalent
 

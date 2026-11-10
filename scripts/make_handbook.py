@@ -329,8 +329,8 @@ callout("Say this",
         "hand-drawn zones. It tracks how long people stay and how fast they move, builds a density "
         "heatmap, and raises an alert only when a zone has been over capacity for three continuous "
         "seconds - so a single bad detection cannot trigger it. A FastAPI server pushes all of "
-        "that to a live dashboard with the annotated video, zone gauges and a headcount chart. It "
-        "runs on a CPU, offline, with open-source parts only.\"")
+        "that to a live dashboard with the annotated video, occupancy meters and a headcount chart. "
+         "It runs on a CPU, offline, with open-source parts only.\"")
 
 heading("The stack, and why each piece", 2)
 
@@ -371,8 +371,8 @@ code("""crowd-analytics/
 │   └── main.py              FastAPI routes (the whole web layer)
 ├── static/                  the dashboard (no build step)
 │   ├── index.html           page structure
-│   ├── app.js               fetches data, draws gauges, chart, alerts
-│   ├── style.css            the dark command-centre theme
+│   ├── app.js               fetches data, draws meters, plan, chart, alerts
+│   ├── style.css            the operations console theme
 │   └── vendor/              Tailwind + Chart.js, so no CDN is needed
 ├── tests/
 │   └── test_pipeline.py     20 tests, in data-flow order
@@ -526,7 +526,7 @@ table(
         ["WS /ws", "snapshot JSON 2x/sec", "Live numbers"],
         ["GET /api/sources", "clip names", "Fills the source picker"],
         ["POST /api/source", "{\"ok\": true}", "Switches clips"],
-        ["GET /api/zones", "polygons + capacities", "Draws gauges before data arrives"],
+        ["GET /api/zones", "polygons + capacities", "Draws the meters and the site plan"],
         ["GET /api/alerts", "newest alerts", "The alert feed"],
         ["GET /api/history", "headcount samples", "The line chart"],
     ],
@@ -534,17 +534,50 @@ table(
 
 heading("The web files", 3)
 
-bullet("361 lines. Seven regions: sticky top bar, error bar, congestion banner, 4 KPI tiles, "
-       "main grid (video + chart | gauges + alerts), footer, and the toast + evidence dialog. "
-       "Plain HTML with Tailwind classes; no framework, no build step.",
+bullet("415 lines. Eight regions: sticky top bar, error bar, congestion banner, the readings "
+       "strip, the console grid (camera + trend | occupancy + site plan + event log), footer, "
+       "toast and evidence dialog. Plain HTML with Tailwind classes; no framework, no build step.",
        "static/index.html - ")
-bullet("1585 lines in numbered sections. The seven jobs: helpers, fetching, KPIs, gauges, "
-       "alerts, chart, live wiring, actions. The function most likely to be asked about is "
-       "update(snapshot), the single entry point for live data.", "static/app.js - ")
-bullet("1213 lines. Design tokens as CSS variables (--bg, --panel, --accent, --ok, --warn, "
-       "--crit), the .glass card surface, .tnum for tabular numbers so digits do not shift, "
-       "status chips that pair colour with an icon, and a prefers-reduced-motion block.",
+bullet("1957 lines in fourteen numbered sections. The jobs: helpers, fetching, KPIs, occupancy "
+       "meters, the site plan, alerts, chart, live wiring, actions. The function most likely to "
+       "be asked about is update(snapshot), the single entry point for live data.",
+       "static/app.js - ")
+bullet("1618 lines. Design tokens as CSS variables (--bg, --panel, --rule, --ink, --ok, --warn, "
+       "--crit, --accent), the flat .glass panel surface with hairline rules, .tnum and .mono for "
+       "tabular numbers so digits do not shift, status chips that pair colour with an icon, and a "
+       "prefers-reduced-motion block. The look is an operations console, not a marketing "
+       "dashboard: flat surfaces, square corners, colour only as a state signal.",
        "static/style.css - ")
+
+heading("Why it looks like this, and not like a dashboard", 3)
+
+para("This matters because the interface is the largest part of the assessment, and \"it looks "
+     "modern\" is not an answer. Every choice below exists to help someone watching a screen for "
+     "an hour, and each is one you can defend in a sentence.")
+
+bullet("The brief is about a crowd, so the video is the biggest thing on the page, not a tile "
+       "among four. The camera panel takes eight of twelve columns.", "The camera dominates: ")
+bullet("Four numbers in one bordered strip rather than four floating cards. Four separate boxes "
+       "compete with the video for attention, and a strip takes half the height.", "One readings strip: ")
+bullet("A bar per zone, not a ring. Capacity is a comparison against a limit; a bar shows how much "
+       "of the limit is used, while a ring makes the reader estimate an angle.",
+       "Occupancy is bars: ")
+bullet("The site plan draws the real zone polygon from zones.json and zooms to fit it, with one "
+       "dot per counted person. An operator recognises their own area, and the plan cannot drift "
+       "from the video overlay because both read the same coordinates.",
+       "The site plan: ")
+bullet("Colour is a state signal, not decoration. Everything is grey until a zone reaches 80 "
+       "percent of capacity (amber) or goes over it (red). A page that is colourful everywhere "
+       "has nowhere to put an alarm.", "Colour means something: ")
+bullet("Numbers are set in a monospace face with tabular figures, so a digit changing from 1 to 7 "
+       "does not shift the layout. Units are small and beside the number, the way a control panel "
+       "is labelled.", "Numbers look like readings: ")
+bullet("Flat surfaces, hairline rules, 4-pixel corners and no soft shadows. This style is borrowed "
+       "from control-room software rather than consumer apps, and it stays legible on a dim "
+       "projector, where a soft shadow turns to mud.", "The finish: ")
+bullet("The layout is a 12-column grid that collapses to one column on a phone, and the readings "
+       "strip goes from four cells to two. Nothing scrolls sideways at any width.",
+       "It is responsive: ")
 
 heading("The supporting files", 3)
 
@@ -625,7 +658,8 @@ para("Panels like concrete arithmetic. These are the worked examples that actual
 
 heading("Counts and fill", 2)
 bullet("7 people in a capacity-4 zone gives fill 7/4 = 1.75, status OVER.", "Over capacity: ")
-bullet("The gauge ring is clamped to 1.0, so it draws a full ring; the OVER chip carries the excess.", "The ring: ")
+bullet("The occupancy bar is clamped to 1.0, so it fills its track exactly; the OVER chip and the "
+       "\"over 3 s\" note carry the excess.", "The bar: ")
 bullet("3 in a capacity-4 zone gives 0.75, and 0.75 is below 0.8, so status is OK.", "Under capacity: ")
 bullet("4 in a capacity-4 zone gives 1.0, which is 80% or more, so status is NEAR, not OVER.", "Exactly full: ")
 
@@ -729,17 +763,21 @@ para("Rehearse this twice. The only timing risk is the first alert, which needs 
 
 callout("Before you start",
         "Open the dashboard in a fresh tab and close every other tab. Each open tab holds its own "
-        "video stream and starves the CPU, which makes the video look black and the frame rate "
-        "drop. This is the single most common way to fail the demo.")
+        "video stream and starves the CPU, which makes the video look black. This is the most "
+        "common way to fail the demo.")
 
 heading("The 3-minute script", 2)
 
-numbered("Start on crowded.mp4. \"This is the live feed. The green boxes are detections, and the "
-         "red polygon is the monitored zone, which is currently over capacity at 6 out of 4.\"")
-numbered("Point at the four KPI tiles. \"People now, peak this session, average dwell, and the "
-         "actual processing rate on this machine - about 10 frames a second on a CPU with no GPU.\"")
-numbered("Point at the zone gauge. \"This ring is the fill ratio. It reads OVER, and below it are "
-         "the average dwell and average movement speed in pixels per second.\"")
+numbered("Start on crowded.mp4. \"This is the live camera. The green boxes are detections, and the "
+         "red polygon on the video is the monitored zone, currently over capacity at 6 out of 4.\"")
+numbered("Point at the readings strip. \"People now, peak this session, average dwell, and the "
+         "actual processing rate on this machine - about 16 frames a second on a CPU, no GPU.\"")
+numbered("Point at the occupancy panel. \"One bar per zone. The bar is how far the zone is towards "
+         "its capacity, and the number on the right is the count against that capacity. This one "
+         "reads OVER, and below the bar are the average dwell and the speed in pixels per second.\"")
+numbered("Point at the site plan. \"The same polygon as on the video, drawn to scale from "
+         "zones.json, with one dot per counted person. It turns amber at 80 percent of capacity and "
+         "solid red when over, so the plan alone says where the problem is.\"")
 numbered("Wait for the alert. \"The banner fires because this zone has been over capacity for "
          "three continuous seconds. A single bad detection cannot trigger it - that is the "
          "debouncer.\"")
@@ -751,6 +789,7 @@ numbered("End on the chart. \"This is headcount over time, with the capacity lin
          "so you can see exactly when the crowd crossed the threshold.\"")
 
 heading("Things to toggle while talking", 2)
+
 bullet("Turns the detection boxes off, so the crowd is visible underneath.", "Boxes chip: ")
 bullet("Turns the zone polygon off, to show the raw footage.", "Zones chip: ")
 bullet("Turns on the density heatmap - where people keep standing over time. This is the "
@@ -761,11 +800,11 @@ heading("If something goes wrong", 2)
 table(
     ["Symptom", "What to do"],
     [
-        ["Video area is black", "Close other browser tabs; the CPU is starved. Reload the page."],
-        ["No alert appears after 40 s", "The clip loops; it will fire on the next pass at ~31 s. Keep talking."],
-        ["Page will not load", "Check the black terminal window is still open and shows no traceback."],
-        ["Port already in use", "A previous server is still running. Stop it, or use --port 8123."],
-        ["Live pill says Reconnecting", "The WebSocket dropped; it retries automatically within a few seconds."],
+        ["Video area is black", "Close other tabs; the CPU is starved. Reload the page."],
+        ["No alert after 40 s", "The clip loops; it fires next pass at ~31 s. Keep talking."],
+        ["Page will not load", "Check the terminal is open with no traceback. A busy port "
+                               "means a server is already running: stop it, or use --port 8123."],
+        ["Live pill says Reconnecting", "The WebSocket dropped; it retries within a few seconds."],
     ],
 )
 
@@ -784,7 +823,8 @@ qa = [
      "The browser loads index.html, then calls /api/sources, /api/zones, /api/history and "
      "/api/alerts, and opens /ws. It then points the <img> at /video. Meanwhile the engine thread "
      "is already looping over the clip. Every 0.5 s the WebSocket pushes a snapshot and the page "
-     "re-renders the KPIs, gauges and chart. The <img> receives a new JPEG up to 15 times a second."),
+     "re-renders the readings strip, the meters, the site plan and the chart. The <img> receives a "
+         "new JPEG up to 15 times a second."),
     ("Why is the vision work in a separate thread?",
      "Because vision is slow - 60 to 110 ms per frame - and the web must be instant. One thread "
      "does the slow work and publishes its result; requests read the last published result under "

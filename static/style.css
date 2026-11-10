@@ -1,65 +1,89 @@
-/* Crowd Analytics dashboard: design tokens and component styles.
+/* Crowd Analytics: the theme for a venue operations console.
  *
- * Why this file is separate from Tailwind: Tailwind supplies layout (grid, flex, spacing),
- * but everything that makes this look like one product lives here. The palette, the type
- * scale, the corner radii and the spacing steps are declared once in :root, so re-theming
- * the dashboard is one edit and no component invents its own value.
+ * The design goal is "the screens an ops room actually runs on", not a marketing dashboard.
+ * Concretely that means:
+ *   - flat surfaces with hairline rules instead of floating glass cards with soft shadows;
+ *   - a dark, slightly blue graphite rather than navy-with-glow, because these screens sit in
+ *     dim rooms and a bright page is tiring to watch for hours;
+ *   - technical readouts: monospaced, tabular, aligned, with units given in small caps beside
+ *     the number, the way a measurement is written on a control panel;
+ *   - colour used as a state signal only. Everything is neutral grey until a zone goes amber or
+ *     red, so the eye goes straight to the thing that needs attention.
+ *
+ * Everything is driven from the tokens in :root below. Re-theming is one edit, and no component
+ * invents its own colour, radius or size.
  *
  * The three rules this file follows everywhere:
- *   1. Two font weights only: 400 for reading, 600 for emphasis.
- *   2. Three corner radii plus a pill: 16 for cards, 10 for blocks inside a card,
- *      8 for controls, 999 for pills.
- *   3. Spacing is a multiple of 4 px. The only exceptions are 1 px borders, 2 px optical
- *      nudges that pull a label closer to its number, and icon stroke widths.
+ *   1. Two font weights for text: 400 to read, 600 to emphasise. Mono is used for numbers.
+ *   2. Three corner radii plus a pill: 4 px for panels, 3 px for blocks, 3 px for controls.
+ *      A console has squarer corners than a consumer app; rounded reads as "friendly", not
+ *      "operational".
+ *   3. Spacing is a multiple of 4 px. The only exceptions are 1 px rules, 2 px optical nudges
+ *      that pull a label closer to its number, and icon stroke widths.
  */
 
 :root {
-  /* ---------- Surfaces ---------- */
-  --bg: #070b14;
-  --panel: #0d1424;
-  /* The card fill is translucent on purpose: the page's radial glows show through it. */
-  --card: rgba(17, 26, 46, 0.72);
-  --border: rgba(255, 255, 255, 0.08);
-  /* A brighter border for the element under the pointer, or the one that is "hot". */
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* ---------- Surfaces ----------
+   * Four steps of one neutral, from the page to the most raised block. Why a step scale instead
+   * of shadows: on a flat panel, depth is read from contrast, and a step scale survives being
+   * projected on a dim screen where a soft shadow turns to mud. */
+  --bg: #0b0e13;
+  --panel: #12161e;
+  --panel-2: #171c26;
+  --panel-3: #1d232f;
+  --rule: #262d3a;
+  --rule-strong: #36404f;
 
-  /* ---------- Semantic colour ---------- */
-  --accent: #38bdf8;
-  --ok: #22c55e;
-  --warn: #f59e0b;
-  --crit: #ef4444;
-  --text: #e6edf7;
-  /* Measured against the card fill: 7.03:1, which passes WCAG AAA for body text. */
-  --muted: #8fa3bf;
+  /* ---------- Ink ----------
+   * --ink is 13.6:1 on --panel, --ink-2 is 7.1:1 (AAA for body), --ink-3 is 4.6:1 (AA for
+   * small text). Nothing on this page is lighter than --ink-3 except disabled controls. */
+  --ink: #e8edf4;
+  --ink-2: #a2aec0;
+  --ink-3: #78859a;
+
+  /* ---------- State colour ----------
+   * One hue per meaning, and each is used for a border or a dot rather than a large fill. Why:
+   * a full red panel is unreadable at a glance across a room, but a red rule and a red value
+   * are unmistakable. */
+  --ok: #3fb950;
+  --warn: #d29922;
+  --crit: #f05252;
+  --accent: #4c9aff;
+
+  /* Tinted washes for chip backgrounds. Kept very dark so the text on top stays readable. */
+  --ok-wash: rgba(63, 185, 80, 0.12);
+  --warn-wash: rgba(210, 153, 34, 0.14);
+  --crit-wash: rgba(240, 82, 82, 0.14);
+  --accent-wash: rgba(76, 154, 255, 0.12);
 
   /* ---------- Shape ---------- */
-  --radius: 16px;      /* a card */
-  --radius-md: 10px;   /* a block inside a card */
-  --radius-sm: 8px;    /* a control: chip, button, select, thumbnail */
+  --radius: 4px;
+  --radius-md: 3px;
+  --radius-sm: 3px;
   --radius-pill: 999px;
 
-  /* ---------- Type scale ----------
-   * Every size in the file comes from this list. Why a fixed list: fractional sizes
-   * (10.5, 11.5, 12.5) made two headings that should match differ by half a pixel, which
-   * reads as sloppy without anyone being able to say why. */
+  /* ---------- Type ----------
+   * A fixed scale. Why fixed: fractional sizes (10.5, 11.5) made two headings that should match
+   * differ by half a pixel, which reads as sloppy without anyone being able to say why. */
   --fs-2xs: 10px;
   --fs-xs: 11px;
   --fs-sm: 12px;
   --fs-md: 13px;
   --fs-lg: 15px;
+  --fs-xl: 20px;
   --fs-2xl: 26px;
   --fs-3xl: 30px;
 
-  /* ---------- Elevation ---------- */
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 40px -20px rgba(0, 0, 0, 0.85);
-  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.4), 0 24px 48px -22px rgba(0, 0, 0, 0.95);
-  --shadow-hot: 0 0 0 1px rgba(239, 68, 68, 0.35), 0 18px 44px -22px rgba(239, 68, 68, 0.55);
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Used for every number that changes: ms, fps, counts, coordinates. A fixed-width figure
+   * cannot jitter when a digit changes, and a mono face makes a reading look like a reading. */
+  --font-mono: ui-monospace, "Cascadia Mono", "Consolas", "SF Mono", Menlo, monospace;
 
   /* ---------- Motion ---------- */
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
-  --dur-fast: 0.15s;
-  --dur-base: 0.24s;
-  --dur-slow: 0.9s;
+  --dur-fast: 0.14s;
+  --dur-base: 0.22s;
+  --dur-slow: 0.7s;
 }
 
 /* ---------- Base ---------- */
@@ -79,112 +103,427 @@ body {
   margin: 0;
   min-height: 100vh;
   background-color: var(--bg);
-  /* Two soft glows give the flat navy some depth. "fixed" keeps them still while scrolling. */
-  background-image:
-    radial-gradient(900px 520px at 12% -12%, rgba(56, 189, 248, 0.1), transparent 62%),
-    radial-gradient(760px 460px at 96% -6%, rgba(34, 197, 94, 0.07), transparent 58%);
-  background-attachment: fixed;
-  color: var(--text);
-  /* system-ui first after Inter: with the font CDN blocked, the fallback is this stack. */
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* A single flat wash at the very top, no radial glow. Why: a glow behind a panel makes text
+   * sit on a gradient, and the contrast then changes as the page scrolls. */
+  background-image: linear-gradient(180deg, #0e1219 0, var(--bg) 320px);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font-family: var(--font-ui);
   font-size: var(--fs-sm);
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Every counter uses tabular figures so digits keep their column while values change.
-   Why it matters: without this, "9" is narrower than "0" and the KPI numbers jitter every tick. */
+/* Every changing digit uses tabular figures so it keeps its column. Without this, "9" is
+ * narrower than "0" and the KPI numbers shuffle sideways twice a second. */
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
 
-/* ---------- The glass card ---------- */
+/* Any run of numbers in the interface: counts, rates, timings, coordinates. */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
 
+/* ---------- The panel ----------
+ * The one surface every section sits on. A hairline rule and a flat fill, no blur and no
+ * shadow: a console is read straight on, and a shadow implies a card that floats over
+ * something, which nothing here does. */
 .glass {
-  background: var(--card);
-  border: 1px solid var(--border);
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  /* The blur is what makes the card read as glass: it samples the page glow behind it. */
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
-  /* Only transform and the two shadow values animate, so a hover never repaints the blur. */
-  transition: transform var(--dur-base) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out),
-              border-color var(--dur-base) var(--ease-out);
 }
 
-/* The lift is 2 px and only for a real pointer. Why the guard: on a touch screen a hover
-   style sticks after a tap, so a card would stay raised until something else was tapped. */
-@media (hover: hover) and (pointer: fine) {
-  .glass:hover {
-    transform: translateY(-2px);
-    border-color: var(--border-strong);
-    box-shadow: var(--shadow-lift);
-  }
+/* The panel header, used by every section. A rule under it separates the label from the data
+ * the way a form is divided on paper. */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  min-height: 34px;
 }
 
-/* The congestion source of a warning gets a faint red edge, so the eye finds it first. */
-.glass.is-hot {
-  border-color: rgba(239, 68, 68, 0.32);
-  box-shadow: var(--shadow-hot);
+.panel-body {
+  padding: 12px;
 }
 
 .section-title {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink-2);
+  /* A 6 px tick before the label, the way a tab is marked on an instrument. */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.icon-badge {
-  position: relative;
+.section-title::before {
+  content: "";
+  width: 2px;
+  height: 10px;
+  background: var(--rule-strong);
+  border-radius: 1px;
+}
+
+/* ---------- Top bar ---------- */
+
+.topbar {
+  border-bottom: 1px solid var(--rule);
+  background: rgba(11, 14, 19, 0.94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.logo-mark {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: rgba(56, 189, 248, 0.12);
-  color: var(--accent);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  /* Flat accent, not a gradient, and a dark glyph on it: the mark is a label, not a lamp. */
+  background: var(--accent);
+  color: #06101f;
   flex: none;
 }
 
-.icon-badge svg {
+.logo-mark svg {
   width: 17px;
   height: 17px;
 }
 
-/* ---------- KPI icon tooltips ---------- */
+.product-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+}
 
-/* Why a CSS tooltip: the icon is decorative (aria-hidden), so a tooltip must not cost a
-   tab stop, and title="" waits about a second before appearing. This one is instant.
-   The same sentence is always visible in the caption underneath, which is what a screen
-   reader reads - so nothing is available only on hover.
+.product-sub {
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+}
 
-   Why display:none at rest: a hidden-but-laid-out tooltip still counts towards the page's
-   scrollable width. At 360 px these 208 px boxes pushed the whole page 53 px sideways, which
-   is the one responsive bug this pass had to fix. display:none removes it from layout, and a
-   keyframe animation (not a transition) still gives the fade-in. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: var(--panel-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* ---------- Live pill ----------
+ * Shaped like a status lamp on a rack: a dot, then the word. Both, because a colour alone is
+ * silent for a colour-blind operator. */
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(63, 185, 80, 0.32);
+  background: var(--ok-wash);
+  color: #7ee787;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color var(--dur-base) linear, background-color var(--dur-base) linear,
+              border-color var(--dur-base) linear;
+}
+
+/* The dot is solid; the ring is an animated box-shadow, which never shifts layout. */
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--ok);
+  animation: pulse-ring 2s infinite;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(63, 185, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
+}
+
+/* ---------- Source select and chips ---------- */
+
+.source-select {
+  appearance: none;
+  height: 30px;
+  padding: 0 30px 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background-color: var(--panel-2);
+  /* The chevron is an inline SVG data URI so no icon library is needed. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2378859a' stroke-width='2.4' stroke-linecap='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  background-size: 12px;
+  color: var(--ink);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  max-width: 100%;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) linear, background-color var(--dur-fast) linear;
+}
+
+.source-select:hover {
+  border-color: var(--rule-strong);
+  background-color: var(--panel-3);
+}
+
+.chip-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: var(--panel-2);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.chip-meta strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ---------- Congestion banner ----------
+ * A hard red bar with a left marker, not a rounded gradient pill. It reads as a strip of
+ * annunciator panel: the thing that lights up when a limit is crossed. */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  background: #2a1114;
+  border: 1px solid rgba(240, 82, 82, 0.5);
+  /* The left marker is what makes it read as an alarm flag rather than a red message box. */
+  border-left: 3px solid var(--crit);
+  color: #ffd7d7;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  animation: banner-in var(--dur-base) var(--ease-out);
+}
+
+.banner[hidden] {
+  display: none;
+}
+
+@keyframes banner-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.banner-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--crit);
+  animation: banner-pulse 1.6s ease-in-out infinite;
+}
+
+.banner-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+@keyframes banner-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* min-width:0 is what lets a long zone name wrap instead of pushing the banner wide. */
+.banner-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.banner-text .banner-count {
+  opacity: 0.8;
+  font-weight: 400;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- KPI strip ----------
+ * No cards. Four cells separated by rules, the way a readings row is printed on a panel. Why:
+ * four floating boxes compete with the video for attention; one strip reads as "these belong
+ * together" and takes half the vertical space. */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .kpi-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.kpi-card {
+  position: relative;
+  padding: 10px 14px 12px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* The internal rules. Drawn as borders rather than gaps so the strip has one outer edge. */
+.kpi-card + .kpi-card {
+  border-left: 1px solid var(--rule);
+}
+
+@media (max-width: 1023px) {
+  /* Two per row on a narrow screen: the second row needs a top rule, and the third cell must
+   * not also get a left border on the row boundary. */
+  .kpi-card:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .kpi-card:nth-child(4) {
+    border-top: 1px solid var(--rule);
+  }
+}
+
+/* The label comes first, the reading second: an operator reads "PEOPLE", then the value. */
+.kpi-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+}
+
+.kpi-label {
+  margin-top: 0;
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpi-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xl);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.kpi-value .unit {
+  font-size: var(--fs-md);
+  font-weight: 400;
+  color: var(--ink-3);
+  margin-left: 3px;
+  letter-spacing: 0;
+}
+
+.kpi-caption {
+  margin-top: 0;
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The little marker beside a KPI label. A 12 px glyph, not a coloured tile: at this size a tile
+ * is a block of colour with a shape lost inside it. */
+.icon-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  background: none;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.icon-badge svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* A KPI cell whose zone is over capacity gets a red left marker, so the strip can be read from
+ * across a room without reading the number. */
+.kpi-card.is-hot::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--crit);
+}
+
+/* ---------- KPI tooltips ----------
+ * A CSS tooltip, not title="": the icon is decorative, so it must not cost a tab stop, and the
+ * native tooltip waits about a second and cannot be styled.
+ *
+ * Why display:none at rest: a hidden-but-laid-out tooltip still counts towards the page's
+ * scrollable width. At 360 px these boxes pushed the whole page sideways. display:none removes
+ * it from layout, and a keyframe animation still gives the fade-in. */
 .icon-badge[data-tip]::after {
   content: attr(data-tip);
   display: none;
   position: absolute;
-  left: 0;
-  /* Below the icon, not above it. Why: the badge sits 16 px from the card's top edge, so an
-     upward tooltip on the first row lands under the sticky header (z-40) and is half hidden.
-     Opening downward always stays inside the card, and the card never clips it. */
-  top: calc(100% + 8px);
+  left: -6px;
+  top: calc(100% + 6px);
   z-index: 30;
   width: max-content;
-  max-width: 208px;
-  padding: 6px 8px;
+  max-width: 210px;
+  padding: 5px 7px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: #0b1220;
-  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.95);
-  color: var(--text);
+  border: 1px solid var(--rule-strong);
+  background: #0d1118;
+  color: var(--ink);
   font-size: var(--fs-xs);
   font-weight: 400;
   line-height: 1.4;
@@ -192,11 +531,11 @@ body {
   text-transform: none;
   text-align: left;
   pointer-events: none;
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.9);
 }
 
-/* The 100 ms delay in the animation shorthand is deliberate: sweeping the pointer across the
-   KPI row should not fire four tooltips in a row. "both" holds the tooltip invisible during
-   that delay instead of flashing it at full opacity. */
+/* The 100 ms delay matters: sweeping the pointer across the strip should not fire four
+ * tooltips in a row. "both" holds it invisible during that delay. */
 .icon-badge[data-tip]:hover::after {
   display: block;
   animation: tip-in var(--dur-fast) var(--ease-out) 0.1s both;
@@ -207,251 +546,7 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ---------- Top bar ---------- */
-
-.logo-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(150deg, rgba(56, 189, 248, 0.9), rgba(56, 189, 248, 0.35));
-  color: #04121f;
-  box-shadow: 0 0 22px -6px rgba(56, 189, 248, 0.8);
-  flex: none;
-}
-
-.logo-mark svg {
-  width: 19px;
-  height: 19px;
-}
-
-/* The product name and its one-line description. Why classes and not Tailwind's text-[15px]:
-   the type scale lives in :root, and an arbitrary bracket value would be a second scale. */
-.product-title {
-  font-size: var(--fs-lg);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-
-.product-sub {
-  font-size: var(--fs-xs);
-  font-weight: 400;
-  color: var(--muted);
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  font-size: var(--fs-2xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-/* ---------- Live pill ---------- */
-
-.live-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px 4px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  background: rgba(34, 197, 94, 0.1);
-  color: #86efac;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition: color var(--dur-base) linear, background-color var(--dur-base) linear,
-              border-color var(--dur-base) linear;
-}
-
-/* The dot itself is solid; the ring around it is an animated box-shadow, which costs less
-   than animating a real element and never shifts the layout. */
-.live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--ok);
-  animation: pulse-ring 2s infinite;
-}
-
-@keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
-  70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-}
-
-/* ---------- Source select and chips ---------- */
-
-.source-select {
-  appearance: none;
-  height: 32px;
-  padding: 0 32px 0 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background-color: rgba(255, 255, 255, 0.04);
-  /* The chevron is an inline SVG data URI so no icon library is needed. */
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238FA3BF' stroke-width='2.2' stroke-linecap='round'><polyline points='6 9 12 15 18 9'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 13px;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: 400;
-  max-width: 100%;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) linear, background-color var(--dur-fast) linear;
-}
-
-.source-select:hover {
-  border-color: var(--border-strong);
-  background-color: rgba(255, 255, 255, 0.07);
-}
-
-.chip-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  font-weight: 400;
-  white-space: nowrap;
-}
-
-.chip-meta strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
-/* ---------- Congestion banner ---------- */
-
-.banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  /* A red gradient, not a flat fill: the eye reads it as an alarm even at a glance. */
-  background: linear-gradient(90deg, #7f1d1d 0%, #dc2626 38%, #ef4444 62%, #991b1b 100%);
-  border: 1px solid rgba(255, 160, 160, 0.35);
-  box-shadow: 0 10px 30px -12px rgba(239, 68, 68, 0.65);
-  color: #fff;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  /* The slide runs when the element goes from display:none to flex, which is exactly when
-     a congestion starts. 6 px of travel is enough to catch the eye without moving the page. */
-  animation: banner-in var(--dur-base) var(--ease-out);
-}
-
-.banner[hidden] {
-  display: none;
-}
-
-@keyframes banner-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.banner-icon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  animation: banner-pulse 1.6s ease-in-out infinite;
-}
-
-.banner-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-@keyframes banner-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.65; transform: scale(0.92); }
-}
-
-/* min-width:0 is what lets a long zone name wrap instead of pushing the banner wide. */
-.banner-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.banner-text .banner-count {
-  opacity: 0.88;
-  font-weight: 400;
-}
-
-/* ---------- KPI cards ---------- */
-
-.kpi-card {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.kpi-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.kpi-value {
-  font-size: var(--fs-3xl);
-  line-height: 1.05;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.kpi-value .unit {
-  font-size: var(--fs-lg);
-  font-weight: 400;
-  color: var(--muted);
-  margin-left: 2px;
-  letter-spacing: 0;
-}
-
-/* 2 px above the label is an optical nudge, not a layout gap: the number's line box already
-   carries space, and at 4 px the pair reads as two unrelated items. */
-.kpi-label {
-  margin-top: 2px;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--text);
-}
-
-.kpi-caption {
-  margin-top: 4px;
-  font-size: var(--fs-xs);
-  font-weight: 400;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ---------- Video card ---------- */
+/* ---------- Video ---------- */
 
 .video-frame {
   position: relative;
@@ -459,9 +554,9 @@ body {
   width: 100%;
   overflow: hidden;
   border-radius: var(--radius-md);
-  background: #04070f;
-  /* A faint inner ring stops the video edge from dissolving into the card. */
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: #05070a;
+  /* A hairline ring, so the video edge does not dissolve into the panel. */
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 
 .video-frame img {
@@ -474,8 +569,7 @@ body {
 }
 
 /* Until the stream URL is set, the <img> has no src. Browsers render a broken-image glyph and
-   the alt text in that state, which would sit on top of the "Waiting for the first frame"
-   placeholder. Hiding the element while it has no source avoids that without any JavaScript. */
+ * the alt text in that state, which would sit on top of the placeholder below. */
 .video-frame img:not([src]) {
   display: none;
 }
@@ -487,16 +581,16 @@ body {
   place-items: center;
   gap: 8px;
   text-align: center;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: var(--fs-sm);
   font-weight: 400;
   padding: 16px;
 }
 
 .video-idle svg {
-  width: 26px;
-  height: 26px;
-  opacity: 0.6;
+  width: 24px;
+  height: 24px;
+  opacity: 0.5;
   margin: 0 auto 8px;
 }
 
@@ -504,23 +598,22 @@ body {
   display: none;
 }
 
-/* The second line of the placeholder: smaller and dimmer than the first, so it reads as a
-   note rather than as a second message. */
 .video-idle-hint {
   margin-top: 2px;
+  font-family: var(--font-mono);
   font-size: var(--fs-2xs);
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
-/* While a different clip is being loaded, a shimmer sweeps the frame and a short label says
-   what is happening. Why not just an empty box: switching clips takes a second or two while the
-   engine seeks, and an empty box looks like a crash. */
+/* While a different clip loads, a shimmer sweeps the frame and a short label says what is
+ * happening. Why not an empty box: switching takes a second or two while the engine seeks, and
+ * an empty box looks like a crash. */
 .video-frame.is-loading::after {
   content: "";
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
   animation: shimmer 1.5s infinite;
   pointer-events: none;
 }
@@ -532,9 +625,9 @@ body {
   place-items: center;
   gap: 8px;
   text-align: center;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  font-weight: 400;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
   padding: 16px;
   pointer-events: none;
 }
@@ -543,303 +636,357 @@ body {
   display: none;
 }
 
-/* A small pulsing dot before the word "Loading", so the label reads as activity. */
 .video-loading-label .dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: var(--radius-pill);
   background: var(--accent);
   margin: 0 auto 4px;
   animation: pulse-ring 1.4s infinite;
 }
 
-/* ---------- Overlay toggles ---------- */
-
+/* ---------- Overlay toggles ----------
+ * A toolbar across the bottom of the frame, on a near-opaque bar. The bar is what keeps the
+ * labels readable over a bright video, and the flat fill is cheaper than a blur. */
 .overlay-toggles {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  /* The backdrop is what keeps the chips readable over a bright video frame. */
-  padding: 4px;
-  border-radius: var(--radius-md);
-  background: rgba(4, 8, 16, 0.55);
-  border: 1px solid var(--border);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  gap: 2px;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 7, 10, 0.82);
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-height: 28px;
-  padding: 4px 8px;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
-  color: var(--muted);
+  color: var(--ink-3);
   font: inherit;
-  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
   transition: background-color var(--dur-fast) linear, color var(--dur-fast) linear,
-              border-color var(--dur-fast) linear, transform var(--dur-fast) var(--ease-out);
+              border-color var(--dur-fast) linear;
 }
 
 .chip svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
 }
 
 .chip:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/* A press moves the control 1 px down instead of shrinking it, so the text never blurs. */
-.chip:active {
-  transform: translateY(1px);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 /* aria-pressed is the source of truth, so the visual state can never disagree with what a
-   screen reader announces. */
+ * screen reader announces. */
 .chip[aria-pressed="true"] {
-  color: #04121f;
-  background: var(--accent);
-  border-color: var(--accent);
+  color: var(--ink);
+  background: rgba(76, 154, 255, 0.18);
+  border-color: rgba(76, 154, 255, 0.45);
 }
 
 .chip[aria-pressed="false"] {
-  color: var(--muted);
+  color: var(--ink-3);
 }
 
 .icon-button {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: rgba(4, 8, 16, 0.55);
-  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 7, 10, 0.75);
+  color: var(--ink-2);
   cursor: pointer;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  transition: background-color var(--dur-fast) linear, border-color var(--dur-fast) linear,
-              transform var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) linear, border-color var(--dur-fast) linear;
 }
 
 .icon-button svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
 
 .icon-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--ink);
 }
 
-.icon-button:active {
-  transform: translateY(1px);
+/* ---------- Zone meters ----------
+ * A horizontal bar per zone, not a ring. Why: capacity is a comparison against a limit, and a
+ * bar shows "how much of the limit" directly, with the tick mark marking the limit itself. A
+ * ring makes the reader estimate an angle.
+ *
+ * The bar is inside a track, and the track is the full capacity, so a bar that overflows its
+ * track is visually obvious before the number is read. */
+.zone-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
-/* ---------- Ring gauges ---------- */
-
-.gauge-grid {
+.zone-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.gauge-card {
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule);
   min-width: 0;
-  padding: 12px 8px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.022);
-  text-align: center;
-  transition: border-color var(--dur-base) linear, background-color var(--dur-base) linear;
 }
 
-.gauge-card.is-hot {
-  border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.05);
+.zone-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
-.gauge {
-  display: block;
-  width: 100%;
-  max-width: 120px;
-  margin: 0 auto;
+.zone-row:first-child {
+  padding-top: 0;
 }
 
-/* The track is the unfilled ring; the value arc is drawn on top of it. */
-.gauge-track {
-  stroke: rgba(255, 255, 255, 0.07);
+/* A zone that is nearly full gets an amber marker, matching its chip and its bar. Why a rule
+ * per state rather than one colour on the row: the marker is what an operator scans for, and
+ * three states need three unambiguous marks. */
+.zone-row.is-near {
+  box-shadow: inset 2px 0 0 var(--warn);
+  background: linear-gradient(90deg, var(--warn-wash), transparent 60%);
+  padding-left: 8px;
+  margin-left: -8px;
 }
 
-.gauge-arc {
-  stroke-linecap: round;
-  /* Two transitions, two jobs: dashoffset is the ring filling, stroke is the colour moving
-     from green to amber to red as the zone crosses a threshold. Without the second one the
-     colour snaps while the ring glides, and the two disagree for 0.9 s. */
-  transition: stroke-dashoffset var(--dur-slow) var(--ease-out),
-              stroke var(--dur-base) linear;
+/* The zone name and its state word share the first line. */
+.zone-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
-.gauge-num {
-  fill: var(--text);
-  font-size: var(--fs-2xl);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-}
-
-.gauge-cap {
-  fill: var(--muted);
-  font-size: var(--fs-xs);
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-}
-
-.gauge-name {
-  margin-top: 4px;
+.zone-name {
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--text);
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
-.gauge-dwell {
-  margin-top: 4px;
+/* The count on the right of the first line: "7 / 4", the reading and its limit. */
+.zone-count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.zone-count .cap {
+  font-weight: 400;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
+/* A row over capacity gets a red left marker and a faint red wash. Why both: the marker is
+ * findable while scanning down the column, the wash confirms it once the eye has landed. */
+.zone-row.is-hot {
+  background: linear-gradient(90deg, var(--crit-wash), transparent 60%);
+  box-shadow: inset 2px 0 0 var(--crit);
+  padding-left: 8px;
+  margin-left: -8px;
+}
+
+.zone-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   font-weight: 400;
-  color: var(--muted);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 
-/* Movement speed under the dwell line: same size and colour, one step quieter in weight. */
-.gauge-speed {
-  margin-top: 2px;
-  font-size: var(--fs-2xs);
-  font-weight: 400;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+/* The fill track: full width, 6 px tall. A hairline outline is what makes an empty track
+ * visible at all against the panel. */
+.zone-track {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 1px;
+  background: var(--panel-3);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  overflow: hidden;
+}
+
+.zone-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  /* Width is set inline from the fill ratio, clamped at 1 by the renderer. */
+  background: var(--ok);
+  border-radius: 1px;
+  transition: width var(--dur-slow) var(--ease-out),
+              background-color var(--dur-base) linear;
+}
+
+/* NEAR is its own colour, not "almost red": at 80% of capacity the area is still safe, and
+ * painting it the same green as an empty one would hide the warning entirely. */
+.zone-row.is-near .zone-fill {
+  background: var(--warn);
+}
+
+.zone-row.is-hot .zone-fill {
+  background: var(--crit);
+}
+
+/* The capacity tick sits at 100% of the track by definition, so instead it marks the point
+ * where the zone went over: a 2 px bright edge at the end of the track. */
+.zone-track::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--rule-strong);
 }
 
 /* ---------- Status chip ---------- */
 
+/* Three signals at once: the word, an icon and a colour. Why: about one man in twelve cannot
+ * separate red from green, so colour alone would be silent for them. */
 .status-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  margin-top: 8px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   font-weight: 600;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
+  flex: none;
 }
 
 .status-chip svg {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
 }
 
-/* Each status is three signals at once: the word, the icon and the colour. Why: about one
-   man in twelve cannot separate red from green, so colour alone would be silent for them. */
 .status-chip.ok {
-  color: #86efac;
-  background: rgba(34, 197, 94, 0.14);
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #7ee787;
+  background: var(--ok-wash);
+  border: 1px solid rgba(63, 185, 80, 0.3);
 }
 
 .status-chip.near {
-  color: #fcd34d;
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.32);
+  color: #e3b341;
+  background: var(--warn-wash);
+  border: 1px solid rgba(210, 153, 34, 0.32);
 }
 
 .status-chip.over {
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.16);
-  border: 1px solid rgba(239, 68, 68, 0.36);
+  color: #ff8f8f;
+  background: var(--crit-wash);
+  border: 1px solid rgba(240, 82, 82, 0.38);
 }
 
 /* ---------- Alert log ---------- */
 
-/* The log scrolls inside its card, so a long history never pushes the page down. 336 px is
-   84 x 4: about six rows, which is enough to see a pattern without owning the screen. */
+/* The log scrolls inside its panel, so a long history never pushes the page down. The height is a
+ * whole number of rows plus the panel's own header, so the last visible row is never cut in half -
+ * a half row reads as a rendering fault rather than a scroll. A row is 35 px including its rule. */
 .alert-list {
   list-style: none;
   margin: 0;
-  padding: 0 4px 0 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 336px;
+  gap: 0;
+  max-height: 245px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
+/* A table row, not a card: one rule between entries, no radius, no gap. */
 .alert-row {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 8px 8px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.025);
+  padding: 7px 10px 7px 12px;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
   overflow: hidden;
+  /* Why this is needed: the list is a flex column with a max-height, and flex items shrink by
+   * default to fit it. Without flex-shrink:0 a long history squeezes every row to a few pixels
+   * instead of scrolling, which silently makes the whole log unreadable. */
+  flex-shrink: 0;
+}
+
+.alert-row:last-child {
+  border-bottom: 0;
 }
 
 .alert-row.is-active {
-  border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.06);
+  background: linear-gradient(90deg, var(--crit-wash), transparent 70%);
 }
 
-/* The severity bar is absolutely positioned so it can hug the rounded left edge. */
+/* The severity bar is absolutely positioned so it can hug the left edge. */
 .alert-sev {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
-  background: var(--muted);
+  width: 2px;
+  background: var(--ink-3);
 }
 
 .alert-sev.crit { background: var(--crit); }
 .alert-sev.warn { background: var(--warn); }
 .alert-sev.ok { background: var(--ok); }
 
-/* The thumbnail: a real keyframe when one exists, an empty frame otherwise. */
+/* The thumbnail: a real keyframe when one exists, an empty frame otherwise. 30x20 is enough to
+ * recognise a scene at a glance while keeping a row to one readable line. */
 .alert-thumb {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 20px;
   padding: 0;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(255, 255, 255, 0.02));
+  border-radius: 2px;
+  border: 1px solid var(--rule);
+  background: var(--panel-3);
   display: grid;
   place-items: center;
-  color: var(--muted);
+  color: var(--ink-3);
   overflow: hidden;
 }
 
 .alert-thumb svg {
-  width: 15px;
-  height: 15px;
-  opacity: 0.75;
+  width: 13px;
+  height: 13px;
+  opacity: 0.7;
 }
 
 .alert-thumb img {
@@ -854,20 +1001,21 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .alert-top {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 7px;
   min-width: 0;
 }
 
 .alert-time {
+  font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   font-weight: 400;
-  color: var(--muted);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
   flex: none;
 }
@@ -881,9 +1029,10 @@ body {
 }
 
 .alert-meta {
-  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
   font-weight: 400;
-  color: var(--muted);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
@@ -893,42 +1042,43 @@ body {
 .alert-tag {
   flex: none;
   margin-left: auto;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .alert-tag.active {
-  color: #fecaca;
-  background: rgba(239, 68, 68, 0.2);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ff8f8f;
+  background: var(--crit-wash);
+  border: 1px solid rgba(240, 82, 82, 0.38);
 }
 
 .alert-tag.cleared {
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
+  color: var(--ink-3);
+  background: var(--panel-3);
+  border: 1px solid var(--rule);
 }
 
 .empty-state {
   display: grid;
   place-items: center;
   gap: 8px;
-  padding: 32px 12px;
+  padding: 28px 12px;
   text-align: center;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: var(--fs-sm);
   font-weight: 400;
 }
 
 .empty-state svg {
-  width: 26px;
-  height: 26px;
-  opacity: 0.5;
+  width: 24px;
+  height: 24px;
+  opacity: 0.45;
 }
 
 /* ---------- Skeletons ---------- */
@@ -936,8 +1086,8 @@ body {
 .skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.055);
+  border-radius: 2px;
+  background: var(--panel-3);
 }
 
 /* The moving highlight is a pseudo-element sweeping across; it never changes the layout. */
@@ -946,7 +1096,7 @@ body {
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.09), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
   animation: shimmer 1.5s infinite;
 }
 
@@ -954,48 +1104,46 @@ body {
   100% { transform: translateX(100%); }
 }
 
-.skeleton-line { height: 10px; }
-.skeleton-value { display: block; height: 26px; width: 62%; }
-.skeleton-ring { height: 96px; width: 96px; border-radius: var(--radius-pill); margin: 0 auto; }
-.skeleton-row { height: 48px; border-radius: var(--radius-md); }
+.skeleton-line { height: 9px; }
+.skeleton-value { display: block; height: 24px; width: 58%; }
+.skeleton-ring { height: 6px; width: 100%; border-radius: 1px; }
+.skeleton-row { height: 34px; border-radius: 0; }
 
-/* The short line under a gauge skeleton: centred, two thirds wide. */
+/* The short line under a meter skeleton: two thirds wide. */
 .skeleton-gauge-line {
   width: 70%;
-  margin: 8px auto 0;
+  margin: 8px 0 0;
 }
 
 /* ---------- Live pill states ---------- */
 
-/* Why a colour change and not just text: at a glance, green means "numbers are arriving" and
-   amber means "these numbers are a few seconds old". Both states are also named in words for
-   anyone who cannot use colour. */
+/* A colour change and a word change, never colour alone. Green means "numbers are arriving";
+ * amber means "these numbers are a few seconds old". */
 .live-pill.is-live {
-  border-color: rgba(34, 197, 94, 0.3);
-  background: rgba(34, 197, 94, 0.1);
-  color: #86efac;
+  border-color: rgba(63, 185, 80, 0.32);
+  background: var(--ok-wash);
+  color: #7ee787;
 }
 
 .live-pill.is-reconnecting {
-  border-color: rgba(245, 158, 11, 0.34);
-  background: rgba(245, 158, 11, 0.12);
-  color: #fcd34d;
+  border-color: rgba(210, 153, 34, 0.34);
+  background: var(--warn-wash);
+  color: #e3b341;
 }
 
-/* The dot follows the pill, so the pulse only runs while the numbers are actually live. */
 .live-pill.is-reconnecting .live-dot {
   background: var(--warn);
   animation: none;
 }
 
 .live-pill.is-waiting {
-  border-color: var(--border);
-  background: rgba(143, 163, 191, 0.1);
-  color: var(--muted);
+  border-color: var(--rule);
+  background: var(--panel-2);
+  color: var(--ink-3);
 }
 
 .live-pill.is-waiting .live-dot {
-  background: var(--muted);
+  background: var(--ink-3);
   animation: none;
 }
 
@@ -1005,12 +1153,13 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 8px 8px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(245, 158, 11, 0.34);
-  background: rgba(245, 158, 11, 0.1);
-  color: #fde68a;
+  margin-bottom: 10px;
+  padding: 7px 8px 7px 10px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(210, 153, 34, 0.34);
+  border-left: 3px solid var(--warn);
+  background: var(--warn-wash);
+  color: #e3b341;
   font-size: var(--fs-sm);
   font-weight: 400;
 }
@@ -1020,12 +1169,12 @@ body {
 }
 
 .error-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   display: block;
 }
 
-/* The message is allowed to wrap and take the free space; the two buttons never shrink. */
+/* The message takes the free space and may wrap; the two buttons never shrink. */
 .error-bar span:nth-child(2) {
   flex: 1;
   min-width: 0;
@@ -1036,36 +1185,32 @@ body {
 .error-close {
   flex: none;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(253, 230, 138, 0.35);
-  background: rgba(253, 230, 138, 0.12);
-  color: #fde68a;
+  border: 1px solid rgba(227, 179, 65, 0.35);
+  background: rgba(227, 179, 65, 0.1);
+  color: #e3b341;
   font: inherit;
-  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--dur-fast) linear, transform var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) linear;
 }
 
 .error-retry {
-  min-height: 28px;
-  padding: 4px 12px;
+  min-height: 26px;
+  padding: 3px 10px;
 }
 
 .error-close {
-  width: 28px;
-  height: 28px;
-  font-size: var(--fs-lg);
+  width: 26px;
+  height: 26px;
+  font-size: var(--fs-md);
   line-height: 1;
 }
 
 .error-retry:hover,
 .error-close:hover {
-  background: rgba(253, 230, 138, 0.22);
-}
-
-.error-retry:active,
-.error-close:active {
-  transform: translateY(1px);
+  background: rgba(227, 179, 65, 0.2);
 }
 
 /* ---------- Chart ---------- */
@@ -1073,15 +1218,126 @@ body {
 /* The canvas needs a box with a height; Chart.js measures this element, not the canvas. */
 .chart-box {
   position: relative;
-  height: 192px;
+  height: 176px;
 }
 
-/* A legend key is a 16 px line sample: wide enough to read, too small to look like data. */
+/* A legend key is a 14 px line sample: wide enough to read, too small to look like data. */
 .legend-swatch {
-  width: 16px;
+  width: 14px;
   height: 2px;
-  border-radius: var(--radius-pill);
+  border-radius: 1px;
   display: inline-block;
+}
+
+/* ---------- Site plan ----------
+ * The zone polygon drawn to scale, with the live fill painted inside it. This is the panel that
+ * makes the page read as a venue tool: an operator recognises the shape of their own area.
+ *
+ * The SVG uses the video frame's own pixel grid as its viewBox, so a polygon from zones.json can
+ * be drawn with no conversion. preserveAspectRatio keeps the floor from being stretched. */
+.site-plan {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.site-plan svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The faint grid behind the plan: it reads as graph paper, which is what a plan is drawn on. */
+.site-plan-grid line {
+  stroke: #1a2029;
+  stroke-width: 1;
+}
+
+/* A zone outline. The dash pattern says "this is a boundary, not an object". */
+.plan-zone {
+  fill: rgba(76, 154, 255, 0.1);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  transition: fill var(--dur-base) linear, stroke var(--dur-base) linear;
+}
+
+.plan-zone.is-near {
+  fill: rgba(210, 153, 34, 0.16);
+  stroke: var(--warn);
+}
+
+.plan-zone.is-over {
+  fill: rgba(240, 82, 82, 0.22);
+  stroke: var(--crit);
+  /* A solid outline for an over-capacity zone: the boundary stops looking provisional. */
+  stroke-dasharray: none;
+}
+
+/* A dot per counted person, drawn inside the zone. Why: the polygon says how full the area is,
+ * and the dots say where the people actually stand within it. */
+.plan-dot {
+  fill: #7ec8ff;
+  opacity: 0.85;
+  transition: fill var(--dur-base) linear;
+}
+
+/* Over capacity turns the people red too, so the whole zone reads as one alarm. */
+.plan-row.is-over .plan-dot {
+  fill: #ff9d9d;
+}
+
+/* The key, bottom left, on a scroll of its own so a long name cannot push the plan around. Why a
+ * key and not a label on the shape: a zone is often a narrow strip, and text laid across it spills
+ * outside the boundary and becomes unreadable. A key is always legible. */
+.plan-key {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  max-width: calc(100% - 12px);
+  padding: 5px 7px;
+  border-radius: 2px;
+  background: rgba(11, 14, 19, 0.88);
+  border: 1px solid var(--rule);
+}
+
+.plan-key-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* The swatch repeats the state colour that the outline is already using, which is what ties the
+ * key entry to its shape on the plan. */
+.plan-key-swatch {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+}
+
+.plan-key-name {
+  color: var(--ink);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-key-count {
+  margin-left: auto;
+  padding-left: 6px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Toast ---------- */
@@ -1089,13 +1345,13 @@ body {
 /* Fixed to the bottom-right so a new alert can never shift the layout under the mouse. */
 .toast-stack {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: 14px;
+  bottom: 14px;
   z-index: 60;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-width: min(344px, calc(100vw - 32px));
+  gap: 6px;
+  max-width: min(340px, calc(100vw - 28px));
   pointer-events: none;
 }
 
@@ -1103,15 +1359,16 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  background: rgba(24, 12, 18, 0.94);
-  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9);
-  color: var(--text);
+  padding: 9px 11px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(240, 82, 82, 0.42);
+  border-left: 3px solid var(--crit);
+  background: #171013;
+  color: var(--ink);
   font-size: var(--fs-sm);
   font-weight: 400;
   pointer-events: auto;
+  box-shadow: 0 14px 34px -16px rgba(0, 0, 0, 0.95);
   animation: toast-in var(--dur-base) var(--ease-out);
 }
 
@@ -1123,16 +1380,16 @@ body {
   flex: none;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  background: rgba(239, 68, 68, 0.16);
-  color: #fca5a5;
+  width: 22px;
+  height: 22px;
+  border-radius: 2px;
+  background: var(--crit-wash);
+  color: #ff8f8f;
 }
 
 .toast-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 .toast-body {
@@ -1140,60 +1397,56 @@ body {
 }
 
 .toast-title {
-  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #fca5a5;
+  color: #ff8f8f;
 }
 
 .toast-text {
   margin-top: 2px;
   font-size: var(--fs-sm);
   font-weight: 400;
-  color: var(--text);
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 
-/* The slide is small on purpose: a long travel would draw the eye away from the alert log. */
+/* The slide is small on purpose: a long travel draws the eye away from the alert log. */
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes toast-out {
-  to { opacity: 0; transform: translateY(8px); }
+  to { opacity: 0; transform: translateX(8px); }
 }
 
 /* ---------- New-alert flash ---------- */
 
-/* A single 1.6 s pulse on the row that just arrived. Why an outline and not a background:
-   the row's background already encodes active/cleared, and overwriting it would hide that. */
+/* A single pulse on the row that just arrived. Why an outline and not a background: the row's
+ * background already encodes active/cleared, and overwriting it would hide that. */
 .alert-row.is-new {
   animation: alert-flash 1.6s ease-out;
 }
 
 @keyframes alert-flash {
-  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.65); }
-  55%  { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  0%   { box-shadow: inset 0 0 0 2px rgba(240, 82, 82, 0.55); }
+  55%  { box-shadow: inset 0 0 0 2px rgba(240, 82, 82, 0); }
+  100% { box-shadow: inset 0 0 0 2px rgba(240, 82, 82, 0); }
 }
 
 /* The thumbnail becomes a real button only when there is a photo to open. */
 .alert-thumb.is-clickable {
   cursor: pointer;
-  transition: border-color var(--dur-fast) linear, transform var(--dur-fast) var(--ease-out);
+  transition: border-color var(--dur-fast) linear;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .alert-thumb.is-clickable:hover {
-    border-color: rgba(56, 189, 248, 0.5);
-    transform: scale(1.04);
+    border-color: rgba(76, 154, 255, 0.6);
   }
-}
-
-.alert-thumb.is-clickable:active {
-  transform: scale(0.97);
 }
 
 /* ---------- Evidence modal ---------- */
@@ -1201,16 +1454,16 @@ body {
 .evidence-modal {
   width: min(760px, calc(100vw - 24px));
   padding: 0;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
-  background: #0b1220;
-  color: var(--text);
+  background: var(--panel);
+  color: var(--ink);
   box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.95);
 }
 
 /* A dimmed, slightly blurred backdrop keeps the alert log visible but clearly behind. */
 .evidence-modal::backdrop {
-  background: rgba(3, 6, 12, 0.72);
+  background: rgba(4, 6, 10, 0.76);
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
@@ -1220,8 +1473,8 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rule);
 }
 
 .evidence-title {
@@ -1231,7 +1484,7 @@ body {
 }
 
 .evidence-body {
-  padding: 12px 16px 0;
+  padding: 12px 14px 0;
 }
 
 .evidence-body img {
@@ -1239,8 +1492,8 @@ body {
   width: 100%;
   height: auto;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: #04070f;
+  border: 1px solid var(--rule);
+  background: #05070a;
 }
 
 /* No src yet means no picture; the note replaces the broken-image glyph. */
@@ -1250,54 +1503,45 @@ body {
 
 .evidence-empty {
   margin: 0;
-  padding: 24px 8px;
+  padding: 22px 8px;
   text-align: center;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: var(--fs-sm);
   font-weight: 400;
 }
 
 .evidence-meta {
-  padding: 12px 16px 16px;
+  padding: 10px 14px 14px;
+  font-family: var(--font-mono);
   font-size: var(--fs-xs);
   font-weight: 400;
-  color: var(--muted);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Footer ---------- */
 
 .footer-status {
-  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
   font-weight: 400;
-  color: var(--muted);
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
 }
 
 /* The credit is the quietest text on the page: present for a panel that looks for it,
-   invisible to someone reading the numbers.
-
-   The 85% alpha is measured, not chosen by eye: at 72% the muted colour falls to 4.41:1
-   against the page, which fails WCAG AA for small text. At 85% it is 5.76:1 and still reads
-   as the quietest line on screen. The colour is declared twice so an older browser without
-   color-mix still gets a legible value instead of inheriting the body colour. */
+ * invisible to someone reading the numbers. */
 .footer-credit {
-  margin-top: 4px;
-  font-size: var(--fs-xs);
+  margin-top: 3px;
+  font-size: var(--fs-2xs);
   font-weight: 400;
-  color: rgba(143, 163, 191, 0.85);
+  color: var(--ink-3);
   letter-spacing: 0.03em;
-}
-
-@supports (color: color-mix(in srgb, red 50%, transparent)) {
-  .footer-credit {
-    color: color-mix(in srgb, var(--muted) 85%, transparent);
-  }
 }
 
 /* ---------- Focus and scrollbars ---------- */
 
-/* A visible ring on keyboard focus only: mouse users never see it, keyboard users always do.
-   Why no border-radius here: setting one would reshape whichever element received focus. */
+/* A visible ring on keyboard focus only: mouse users never see it, keyboard users always do. */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -1312,24 +1556,20 @@ body {
 }
 
 .alert-list::-webkit-scrollbar-thumb {
-  background: rgba(143, 163, 191, 0.28);
+  background: var(--rule-strong);
   border-radius: var(--radius-pill);
 }
 
 .alert-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(143, 163, 191, 0.5);
+  background: var(--ink-3);
 }
 
 /* ---------- Responsive ---------- */
 
-/* At 360-420 px the ring is the only thing that can shrink without losing meaning. */
+/* At 360-420 px the readings are the only thing that can shrink without losing meaning. */
 @media (max-width: 420px) {
-  .gauge {
-    max-width: 96px;
-  }
-
   .kpi-card {
-    padding: 12px;
+    padding: 8px 10px 10px;
   }
 
   .kpi-value {
@@ -1337,22 +1577,14 @@ body {
   }
 
   .kpi-label {
-    font-size: var(--fs-sm);
-  }
-
-  .gauge-num {
-    font-size: var(--fs-2xl);
-  }
-
-  .gauge-grid {
-    gap: 4px;
+    font-size: var(--fs-2xs);
   }
 
   /* The source picker is the widest flexible item in the bar. Capping it keeps the product
      name readable instead of letting the select squeeze it to one letter. */
   .source-select {
-    max-width: 128px;
-    padding-right: 28px;
+    max-width: 122px;
+    padding-right: 26px;
   }
 
   /* The clock is the least important item in the bar on a phone. Dropping it buys the space
@@ -1363,7 +1595,7 @@ body {
 
   .banner {
     gap: 8px;
-    padding: 12px;
+    padding: 8px 10px;
     font-size: var(--fs-sm);
   }
 
@@ -1376,8 +1608,8 @@ body {
 
 /* ---------- Reduced motion ---------- */
 
-/* Why: users who ask their OS for less motion get no pulsing, no shimmer, no slide and no
-   ring sweep. Every value is still correct; it simply appears instead of travelling. */
+/* Why: users who ask their OS for less motion get no pulsing, no shimmer, no slide and no bar
+ * sweep. Every value is still correct; it simply appears instead of travelling. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1387,21 +1619,11 @@ body {
     transition-duration: 0.001ms !important;
   }
 
-  /* A transform is a movement even when it is instant, so hover lifts are cancelled outright. */
-  .glass:hover,
-  .alert-thumb.is-clickable:hover,
-  .chip:active,
-  .icon-button:active,
-  .error-retry:active,
-  .error-close:active {
-    transform: none;
-  }
-
   .skeleton::after {
     display: none;
   }
 
   .skeleton {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--panel-3);
   }
 }

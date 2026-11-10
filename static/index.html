@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Crowd Analytics — Density &amp; Bottleneck Monitor</title>
-  <meta name="description" content="Live crowd density, zone capacity and bottleneck analytics dashboard.">
+  <title>Crowd Analytics: Density and Bottleneck Monitor</title>
+  <meta name="description" content="Live crowd density, zone capacity and bottleneck analytics for venue operations.">
 
   <!-- Inter is optional polish: if this request fails (offline demo), the CSS falls back to
        system-ui, so the page still looks right. It is a <link>, not a blocking @import, so a
@@ -22,76 +22,78 @@
   <!-- Chart.js draws the headcount line. It is the only charting library we use. -->
   <script src="/static/vendor/chart.umd.min.js"></script>
 
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070B14'/%3E%3Cg stroke='%2338BDF8' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M10 23v-6'/%3E%3Cpath d='M16 23V13'/%3E%3Cpath d='M22 23V9'/%3E%3C/g%3E%3C/svg%3E">
+  <!-- The favicon is a zone outline with a dot in it: the product's two ideas in 32 px. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0e13'/%3E%3Cpath d='M7 9h18v14H7z' fill='none' stroke='%234c9aff' stroke-width='2' stroke-dasharray='4 3'/%3E%3Ccircle cx='13' cy='16' r='2' fill='%234c9aff'/%3E%3Ccircle cx='20' cy='13' r='2' fill='%23f05252'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
-  <!-- ============ 1. Sticky top bar ============ -->
-  <header class="sticky top-0 z-40 border-b border-white/[0.07] bg-[#070B14]/80 backdrop-blur-xl">
-    <div class="mx-auto max-w-[1440px] px-3 sm:px-5">
-      <div class="flex h-[58px] items-center gap-2.5 sm:gap-3">
+  <!-- ============ 1. Top bar ============
+       A console header, not a marketing navbar: the site name, then the controls an operator
+       touches, then the clock. It is one row at every width. -->
+  <header class="topbar sticky top-0 z-40">
+    <div class="mx-auto max-w-[1560px] px-3 sm:px-4">
+      <div class="flex h-[52px] items-center gap-2 sm:gap-3">
 
-        <!-- Logo mark: three bars of rising height, drawn as inline SVG so no icon pack is needed. -->
+        <!-- Logo mark: a monitored area with two people in it, drawn as inline SVG so no icon
+             pack is needed. -->
         <div class="logo-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
-               stroke-linecap="round">
-            <path d="M4 19V13"></path>
-            <path d="M10 19V8"></path>
-            <path d="M16 19V4"></path>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7h18v11H3z" stroke-dasharray="4 3"></path>
+            <circle cx="9" cy="13" r="1.6" fill="currentColor" stroke="none"></circle>
+            <circle cx="15" cy="11" r="1.6" fill="currentColor" stroke="none"></circle>
           </svg>
         </div>
 
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h1 class="product-title truncate">
-              Crowd Analytics
-            </h1>
+            <h1 class="product-title truncate">Crowd Analytics</h1>
             <!-- The tag is hidden on phones: at 360 px it competes with the title and the
                  title truncates to a single letter, which reads as a rendering bug. -->
             <span class="tag hidden sm:inline-flex">Track A</span>
           </div>
           <!-- Hidden on the narrowest phones so the bar never wraps. -->
           <p class="product-sub hidden truncate sm:block">
-            Density &amp; bottleneck monitor
+            Density and bottleneck monitoring
           </p>
         </div>
 
-        <div class="ml-auto flex items-center gap-2 sm:gap-2.5">
+        <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
           <!-- Source picker: the options are filled from GET /api/sources by app.js. -->
-          <label class="sr-only" for="source-select">Source clip</label>
+          <label class="sr-only" for="source-select">Camera feed</label>
           <select id="source-select" class="source-select">
-            <option value="">Loading…</option>
+            <option value="">Loading...</option>
           </select>
 
           <!-- The LIVE pill reports the WebSocket state, not the engine's: it says Connected
                while messages arrive and Reconnecting when they stop. -->
           <span class="live-pill is-waiting hidden sm:inline-flex" id="live-pill"
-                role="status" aria-live="polite" title="WebSocket connection state">
+                role="status" aria-live="polite" title="Data connection state">
             <span class="live-dot" aria-hidden="true"></span>
-            <span id="live-label">Connecting</span>
+            <span id="live-label">Wait</span>
           </span>
 
-          <span class="chip-meta hidden md:inline-flex" title="Processing frames per second">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+          <span class="chip-meta hidden md:inline-flex" title="Frames processed per second">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"></path>
             </svg>
             <strong class="tnum" id="fps-chip">0.0</strong> fps
           </span>
 
-          <span class="chip-meta tnum" id="clock" title="Current time">--:--:--</span>
+          <span class="chip-meta tnum" id="clock" title="Local time">--:--:--</span>
         </div>
       </div>
     </div>
   </header>
 
-  <main class="mx-auto max-w-[1440px] px-3 pb-10 pt-3 sm:px-5 sm:pt-4">
+  <main class="mx-auto max-w-[1560px] px-3 pb-8 pt-3 sm:px-4">
 
-    <!-- ============ 1b. Inline error bar ============ -->
-    <!-- A failed fetch or a lost connection reports itself here in one line. Why an inline bar
-         and not an alert(): window.alert blocks the video thread and cannot be styled or
-         dismissed, and the brief says the page must never go blank. -->
+    <!-- ============ 1b. Inline error bar ============
+         A failed fetch or a lost connection reports itself here in one line. Why an inline bar
+         and not alert(): window.alert blocks the video thread and cannot be styled or dismissed,
+         and the page must never go blank. -->
     <div id="error-bar" class="error-bar" role="status" aria-live="polite" hidden>
       <span class="error-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
@@ -103,36 +105,35 @@
       </span>
       <span id="error-text">Something went wrong.</span>
       <button type="button" class="error-retry" id="error-retry">Retry</button>
-      <button type="button" class="error-close" id="error-close" aria-label="Dismiss">×</button>
+      <button type="button" class="error-close" id="error-close" aria-label="Dismiss">&times;</button>
     </div>
 
-    <!-- ============ 2. Congestion banner ============ -->
-    <!-- Driven by the WebSocket snapshot: visible only while alerts_active > 0. Hidden by
+    <!-- ============ 2. Congestion banner ============
+         Driven by the WebSocket snapshot: visible only while alerts_active > 0. Hidden by
          default so there is no flash of a stale warning before the first message. -->
-    <div class="mb-3">
-      <div id="congestion-banner" class="banner" role="status" aria-live="polite" hidden>
-        <span class="banner-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-               stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-            <path d="M12 9v4"></path>
-            <path d="M12 17h.01"></path>
-          </svg>
-        </span>
-        <span class="banner-text" id="banner-text"></span>
-      </div>
+    <div id="congestion-banner" class="banner mb-2.5" role="status" aria-live="polite" hidden>
+      <span class="banner-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <path d="M12 9v4"></path>
+          <path d="M12 17h.01"></path>
+        </svg>
+      </span>
+      <span class="banner-text" id="banner-text"></span>
     </div>
 
-    <!-- ============ 3. KPI row ============ -->
-    <!-- 2x2 on phones, 4 across from 1024 px up. -->
-    <section aria-label="Key metrics"
-             class="mb-3 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-      <article class="glass kpi-card" id="kpi-people">
+    <!-- ============ 3. Readings strip ============
+         Four cells in one bordered strip, not four floating cards. The label comes before the
+         reading, the way a gauge is marked, so the eye lands on the number already knowing what
+         it measures. -->
+    <section aria-label="Key readings" class="kpi-strip mb-2.5">
+      <article class="kpi-card" id="kpi-people">
         <div class="kpi-top">
           <!-- data-tip is read by CSS (an instant tooltip); the icon is aria-hidden because the
-               label and caption underneath already say the same thing in text. -->
+               label beside it already says the same thing in text. -->
           <span class="icon-badge" aria-hidden="true"
-                data-tip="How many people are inside the monitored zones right now.">
+                data-tip="How many people are inside the monitored areas right now.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
@@ -141,201 +142,224 @@
               <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
           </span>
+          <span class="kpi-label">People now</span>
         </div>
-        <div class="kpi-value tnum" data-kpi="people">—</div>
-        <div class="kpi-label">People now</div>
-        <div class="kpi-caption" data-kpi-caption="people">inside monitored zones</div>
+        <div class="kpi-value tnum" data-kpi="people">&mdash;</div>
+        <div class="kpi-caption" data-kpi-caption="people">inside monitored areas</div>
       </article>
 
-      <article class="glass kpi-card" id="kpi-peak">
+      <article class="kpi-card" id="kpi-peak">
         <div class="kpi-top">
           <span class="icon-badge" aria-hidden="true"
-                data-tip="The largest number seen in a single frame since this clip started.">
+                data-tip="The largest number seen in a single frame since this feed started.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 17l6-6 4 4 7-7"></path>
               <path d="M14 8h6v6"></path>
             </svg>
           </span>
+          <span class="kpi-label">Peak this session</span>
         </div>
-        <div class="kpi-value tnum" data-kpi="peak">—</div>
-        <div class="kpi-label">Peak (session)</div>
-        <div class="kpi-caption" data-kpi-caption="peak">highest frame so far</div>
+        <div class="kpi-value tnum" data-kpi="peak">&mdash;</div>
+        <div class="kpi-caption" data-kpi-caption="peak">highest single frame</div>
       </article>
 
-      <article class="glass kpi-card" id="kpi-dwell">
+      <article class="kpi-card" id="kpi-dwell">
         <div class="kpi-top">
           <span class="icon-badge" aria-hidden="true"
-                data-tip="How long a person stays in the busiest zone, averaged over visits.">
+                data-tip="How long a person stays in the busiest area, averaged over visits.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="9"></circle>
               <path d="M12 7v5l3 2"></path>
             </svg>
           </span>
+          <span class="kpi-label">Avg dwell</span>
         </div>
-        <div class="kpi-value tnum" data-kpi="dwell">—</div>
-        <div class="kpi-label">Average dwell</div>
-        <div class="kpi-caption" data-kpi-caption="dwell">time spent per visit</div>
+        <div class="kpi-value tnum" data-kpi="dwell">&mdash;</div>
+        <div class="kpi-caption" data-kpi-caption="dwell">time per visit</div>
       </article>
 
-      <article class="glass kpi-card" id="kpi-fps">
+      <article class="kpi-card" id="kpi-fps">
         <div class="kpi-top">
           <span class="icon-badge" aria-hidden="true"
-                data-tip="How many video frames the detector can process per second on this CPU.">
+                data-tip="How many video frames the detector processes per second on this CPU.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"></path>
             </svg>
           </span>
+          <span class="kpi-label">Throughput</span>
         </div>
-        <div class="kpi-value tnum" data-kpi="fps">—</div>
-        <div class="kpi-label">Processing FPS</div>
-        <div class="kpi-caption" data-kpi-caption="fps">detections per second</div>
+        <div class="kpi-value tnum" data-kpi="fps">&mdash;</div>
+        <div class="kpi-caption" data-kpi-caption="fps">frames per second</div>
       </article>
     </section>
 
-    <!-- ============ 4. Main grid ============ -->
-    <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
+    <!-- ============ 4. Console grid ============
+         8/4 on a wide screen: the camera and the trend on the left, the plan and the log on the
+         right. This is the layout of an ops screen, where the picture is the biggest element. -->
+    <div class="grid grid-cols-1 gap-2.5 lg:grid-cols-12">
 
       <!-- ---------- Left column, 8/12 ---------- -->
-      <div class="flex min-w-0 flex-col gap-3 lg:col-span-8">
+      <div class="flex min-w-0 flex-col gap-2.5 lg:col-span-8">
 
-        <!-- Video card -->
-        <section class="glass p-2.5 sm:p-3" aria-label="Live video">
-          <div class="mb-2 flex items-center justify-between gap-2 px-0.5">
-            <span class="section-title">Live feed</span>
-            <span class="chip-meta" id="video-source-chip">sample.mp4</span>
+        <!-- Camera -->
+        <section class="glass" aria-label="Live camera feed">
+          <div class="panel-head">
+            <span class="section-title">Camera 01</span>
+            <span class="chip-meta" id="video-source-chip">no signal</span>
           </div>
+          <div class="panel-body" style="padding:8px">
+            <div class="video-frame">
+              <!-- The src is set by app.js from the current overlay flags; until then the
+                   placeholder below is what the user sees. -->
+              <img id="video" alt="Live annotated camera feed with detection boxes and zone overlays">
 
-          <div class="video-frame">
-            <!-- The src is set by app.js from the current overlay flags; until then the
-                 placeholder below is what the user sees. -->
-            <img id="video" alt="Live annotated video with detection boxes and zone overlays">
-
-            <!-- Shown until the stream is attached, then hidden by app.js. -->
-            <div class="video-idle" id="video-idle">
-              <div>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                  <path d="M10 9l5 3-5 3V9z"></path>
-                </svg>
-                <span id="video-idle-text">Waiting for the first frame…</span>
-                <div class="video-idle-hint">
-                  the engine takes a few seconds to load the model
+              <!-- Shown until the stream is attached, then hidden by app.js. -->
+              <div class="video-idle" id="video-idle">
+                <div>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                    <path d="M10 9l5 3-5 3V9z"></path>
+                  </svg>
+                  <span id="video-idle-text">Waiting for the first frame...</span>
+                  <div class="video-idle-hint">engine loading model</div>
                 </div>
               </div>
-            </div>
 
-            <!-- Shown while a different clip is being switched to. -->
-            <div class="video-loading-label" id="video-loading-label" hidden>
-              <div>
-                <div class="dot" aria-hidden="true"></div>
-                Loading clip…
+              <!-- Shown while a different feed is being switched to. -->
+              <div class="video-loading-label" id="video-loading-label" hidden>
+                <div>
+                  <div class="dot" aria-hidden="true"></div>
+                  Switching feed...
+                </div>
+              </div>
+
+              <!-- Fullscreen sits above the toolbar, top right, like a player control. -->
+              <button type="button" class="icon-button" id="fullscreen"
+                      title="Fullscreen" aria-label="Toggle fullscreen"
+                      style="position:absolute;right:8px;top:8px;z-index:2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                  <path d="M16 3h3a2 2 0 0 1 2 2v3"></path>
+                  <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+                  <path d="M8 21H5a2 2 0 0 1-2-2v-3"></path>
+                </svg>
+              </button>
+
+              <!-- Overlay toolbar: labels first, then the switch, the way a video switcher is
+                   laid out. Each chip is a toggle and its state is in aria-pressed. -->
+              <div class="overlay-toggles" role="group" aria-label="Video overlays">
+                <button type="button" class="chip" id="toggle-boxes" aria-pressed="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" aria-hidden="true">
+                    <rect x="3" y="3" width="8" height="8" rx="1"></rect>
+                    <rect x="13" y="13" width="8" height="8" rx="1"></rect>
+                  </svg>
+                  Boxes
+                </button>
+                <button type="button" class="chip" id="toggle-zones" aria-pressed="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path>
+                    <path d="M9 3v15"></path>
+                    <path d="M15 6v15"></path>
+                  </svg>
+                  Zones
+                </button>
+                <button type="button" class="chip" id="toggle-heat" aria-pressed="false">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 2c1.5 4 4 5.5 4 9a4 4 0 0 1-8 0c0-1.5.6-2.6 1.4-3.6"></path>
+                    <path d="M12 22a6 6 0 0 1-6-6"></path>
+                  </svg>
+                  Heatmap
+                </button>
               </div>
             </div>
-
-            <div class="overlay-toggles" role="group" aria-label="Video overlays">
-              <button type="button" class="chip" id="toggle-boxes" aria-pressed="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" aria-hidden="true">
-                  <rect x="3" y="3" width="8" height="8" rx="1"></rect>
-                  <rect x="13" y="13" width="8" height="8" rx="1"></rect>
-                </svg>
-                Boxes
-              </button>
-              <button type="button" class="chip" id="toggle-zones" aria-pressed="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path>
-                  <path d="M9 3v15"></path>
-                  <path d="M15 6v15"></path>
-                </svg>
-                Zones
-              </button>
-              <button type="button" class="chip" id="toggle-heat" aria-pressed="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M12 2c1.5 4 4 5.5 4 9a4 4 0 0 1-8 0c0-1.5.6-2.6 1.4-3.6"></path>
-                  <path d="M12 22a6 6 0 0 1-6-6"></path>
-                </svg>
-                Heatmap
-              </button>
-            </div>
-
-            <button type="button" class="icon-button" id="fullscreen"
-                    title="Fullscreen" aria-label="Toggle fullscreen"
-                    style="position:absolute;right:10px;top:10px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
-                <path d="M16 3h3a2 2 0 0 1 2 2v3"></path>
-                <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
-                <path d="M8 21H5a2 2 0 0 1-2-2v-3"></path>
-              </svg>
-            </button>
           </div>
         </section>
 
-        <!-- Headcount chart -->
-        <section class="glass p-3 sm:p-4" aria-label="Headcount over time">
-          <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <span class="section-title">Headcount</span>
-              <p class="product-sub" id="chart-window">
-                last 120 samples
-              </p>
+        <!-- Headcount trend -->
+        <section class="glass" aria-label="Headcount over time">
+          <div class="panel-head">
+            <div class="flex items-baseline gap-2">
+              <span class="section-title">Headcount trend</span>
+              <span class="product-sub" id="chart-window">last 120 samples</span>
             </div>
-            <!-- The legend is written as HTML, so the capacity line is labelled without
-                 relying on Chart.js's own legend rendering. The zone swatches are added by
-                 app.js once /api/zones has answered. -->
+            <!-- The legend is written as HTML, so the capacity line is labelled without relying
+                 on Chart.js's own legend rendering. The zone swatches are added by app.js once
+                 /api/zones has answered. -->
             <div class="flex flex-wrap items-center gap-3 product-sub" id="chart-legend">
-              <span class="inline-flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5">
                 <span class="legend-swatch" style="background:var(--accent)"></span>
                 Total
               </span>
-              <span class="inline-flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5">
                 <span class="legend-swatch"
-                      style="background:repeating-linear-gradient(90deg,var(--crit) 0 4px,transparent 4px 7px)">
+                      style="background:repeating-linear-gradient(90deg,var(--crit) 0 3px,transparent 3px 6px)">
                 </span>
                 Capacity
               </span>
             </div>
           </div>
-          <div class="chart-box">
-            <canvas id="headcount-chart" aria-label="Headcount over time chart" role="img"></canvas>
+          <div class="panel-body">
+            <div class="chart-box">
+              <canvas id="headcount-chart" aria-label="Headcount over time chart" role="img"></canvas>
+            </div>
           </div>
         </section>
       </div>
 
       <!-- ---------- Right column, 4/12 ---------- -->
-      <div class="flex min-w-0 flex-col gap-3 lg:col-span-4">
+      <div class="flex min-w-0 flex-col gap-2.5 lg:col-span-4">
 
-        <!-- Zone gauges -->
-        <section class="glass p-3" aria-label="Zone occupancy">
-          <div class="mb-2.5 flex items-center justify-between">
-            <span class="section-title">Zones</span>
-            <span class="chip-meta" id="zones-summary">—</span>
+        <!-- Occupancy by zone. Meters, not rings: capacity is a comparison against a limit. -->
+        <section class="glass" aria-label="Occupancy by zone">
+          <div class="panel-head">
+            <span class="section-title">Occupancy</span>
+            <span class="chip-meta" id="zones-summary">&mdash;</span>
           </div>
-          <!-- Filled by renderGauges(); the placeholder shows how a skeleton looks. -->
-          <div class="gauge-grid" id="zone-gauges">
-            <div class="gauge-card">
-              <div class="skeleton skeleton-ring"></div>
-              <div class="skeleton skeleton-line skeleton-gauge-line"></div>
+          <div class="panel-body">
+            <!-- Filled by renderGauges(); the placeholder shows how a skeleton looks. -->
+            <div class="zone-grid" id="zone-gauges">
+              <div class="zone-row">
+                <div class="skeleton skeleton-line" style="width:50%"></div>
+                <div class="skeleton skeleton-ring" style="margin-top:6px"></div>
+              </div>
+              <div class="zone-row">
+                <div class="skeleton skeleton-line" style="width:40%"></div>
+                <div class="skeleton skeleton-ring" style="margin-top:6px"></div>
+              </div>
             </div>
-            <div class="gauge-card">
-              <div class="skeleton skeleton-ring"></div>
-              <div class="skeleton skeleton-line skeleton-gauge-line"></div>
+          </div>
+        </section>
+
+        <!-- Site plan: the zone geometry, drawn to scale, with the live fill painted in. -->
+        <section class="glass" aria-label="Site plan">
+          <div class="panel-head">
+            <span class="section-title">Site plan</span>
+            <span class="product-sub">frame coordinates</span>
+          </div>
+          <div class="panel-body" style="padding:8px">
+            <!-- Filled by renderPlan(). The SVG coordinate space is the 640x360 frame, so a
+                 polygon from zones.json is drawn with no conversion at all. -->
+            <div class="site-plan" id="site-plan">
+              <div class="empty-state" style="height:100%">
+                <span>drawing plan...</span>
+              </div>
             </div>
           </div>
         </section>
 
         <!-- Alert log -->
-        <section class="glass flex-1 p-3" aria-label="Alert log">
-          <div class="mb-2.5 flex items-center justify-between gap-2">
-            <span class="section-title">Alert log</span>
-            <span class="chip-meta" id="alerts-summary">—</span>
+        <section class="glass flex-1" aria-label="Alert log">
+          <div class="panel-head">
+            <span class="section-title">Event log</span>
+            <span class="chip-meta" id="alerts-summary">&mdash;</span>
           </div>
           <!-- tabindex: this list scrolls, and a scrollable box that no key can reach is a WCAG
                2.1.1 failure for anyone not using a mouse. Focusing the region lets the arrow
@@ -345,26 +369,23 @@
       </div>
     </div>
 
-    <!-- ============ 5. Footer ============ -->
-    <!-- Two lines, both centred and quiet: the live status first (it changes), then the credit
-         and the model that produced the numbers. -->
-    <footer class="mt-4 text-center">
-      <p class="footer-status" id="footer-status">
-        Connecting to the engine…
-      </p>
+    <!-- ============ 5. Footer ============
+         The live status first (it changes), then the credit and the model. -->
+    <footer class="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <p class="footer-status" id="footer-status">Connecting to the engine...</p>
       <p class="footer-credit">
-        Cogno Valley Labs, Internship Round 1 · YOLOv8n + ByteTrack on CPU
+        Cogno Valley Labs, Internship Round 1 &middot; YOLOv8n + ByteTrack, CPU only
       </p>
     </footer>
   </main>
 
-  <!-- ============ 6. Toast ============ -->
-  <!-- A new alert announces itself for a few seconds. aria-live="assertive" because an
-       over-capacity zone is exactly the news that should interrupt a screen reader. -->
+  <!-- ============ 6. Toast ============
+       A new alert announces itself for a few seconds. aria-live="assertive" because an
+       over-capacity area is exactly the news that should interrupt a screen reader. -->
   <div class="toast-stack" id="toast-stack" aria-live="assertive" aria-atomic="false"></div>
 
-  <!-- ============ 7. Evidence modal ============ -->
-  <!-- Why a <dialog>: the browser gives focus trapping, Escape-to-close and an inert backdrop
+  <!-- ============ 7. Evidence dialog ============
+       Why a <dialog>: the browser gives focus trapping, Escape-to-close and an inert backdrop
        for free, which a hand-rolled overlay has to reimplement and usually gets wrong. -->
   <dialog id="evidence-modal" class="evidence-modal" aria-labelledby="evidence-title">
     <div class="evidence-head">
@@ -381,7 +402,7 @@
       </button>
     </div>
     <div class="evidence-body">
-      <img id="evidence-image" alt="Snapshot taken when the alert fired">
+      <img id="evidence-image" alt="Frame captured when the alert fired">
       <p class="evidence-empty" id="evidence-empty" hidden>
         No snapshot was saved for this alert.
       </p>
