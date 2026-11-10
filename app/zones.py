@@ -76,8 +76,7 @@ def load_zones(path: Path, source_name: str) -> list[Zone]:
     if source_name not in data:
         raise SystemExit(
             f"No zones for clip '{source_name}' in {path}.\n"
-            f"Generate them first: .\\.venv\\Scripts\\python.exe scripts\\auto_zones.py "
-            f"demo_videos\\{source_name}"
+            f"Add an entry named \"{source_name}\" to that file first."
         )
 
     zones: list[Zone] = []

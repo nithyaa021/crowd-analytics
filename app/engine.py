@@ -191,7 +191,7 @@ class Engine(threading.Thread):
         self._frame_times: list[float] = []
         # Cache of parsed zones per clip name. Why: /video renders up to 15 frames a second and
         # re-reading zones.json for every one of them is 15 file reads a second for data that
-        # only changes when the operator runs auto_zones.py.
+        # only changes when the operator edits zones.json.
         self._zones_cache: dict[str, list[Zone]] = {}
         # Set by run() once a clip has published its first frame, so the smoke test can wait
         # for "the engine is actually producing" instead of guessing with a sleep.
@@ -585,7 +585,7 @@ class Engine(threading.Thread):
 
         Why rebuild from the snapshot rather than hold Zones on self: the geometry lives in
         zones.json and the counts live in the snapshot. Reading them together means /video can
-        never draw a stale polygon, for example right after auto_zones.py replaced the file.
+        never draw a stale polygon, for example right after zones.json was edited by hand.
 
         Why a cache: /video renders up to MJPEG_MAX_FPS frames a second, and re-parsing
         zones.json for each one is wasted work for data that rarely changes. The cache is keyed by
