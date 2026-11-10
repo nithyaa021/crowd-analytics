@@ -179,7 +179,9 @@ crowd-analytics/
 ├── demo_videos/         three clips + expected_results.md
 ├── docs/
 │   ├── architecture.png  the four-layer diagram above
-│   └── dashboard.png     screenshot of the dashboard mid-alert
+│   ├── dashboard.png     screenshot of the dashboard mid-alert
+│   ├── Crowd_Analytics_Handbook.docx   16-page interview handbook
+│   └── Crowd_Analytics_Reference.docx  complete technical reference, file by file
 ├── zones.json           zone polygons and capacities, per clip
 ├── CODE_GUIDE.md        the full code walkthrough, file by file
 ├── requirements.txt     pinned dependencies
@@ -269,6 +271,13 @@ On the target laptop — 11th Gen Intel i3-1125G4, 4 physical cores, no GPU:
 [`CODE_GUIDE.md`](CODE_GUIDE.md) is a full walkthrough: the architecture, the frame-by-frame data
 flow, every file and function, the worked arithmetic behind each number, the design decisions and
 their justifications, and the likely interview questions with short answers.
+
+[`docs/Crowd_Analytics_Reference.docx`](docs/Crowd_Analytics_Reference.docx) is the same material as
+a 31-page printed reference: every file in the project, every function a panel will ask about, the
+dashboard design argued from first principles, the measured numbers, the defects found and fixed,
+and the limitations stated honestly. It is monochrome throughout, so it prints on any mono printer.
+[`docs/Crowd_Analytics_Handbook.docx`](docs/Crowd_Analytics_Handbook.docx) is the short version: a
+16-page script for the 3-minute live walkthrough.
 
 ---
 
