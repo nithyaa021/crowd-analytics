@@ -18,3 +18,6 @@ AGENTS.md
 logs*.txt
 docs/_preview.pdf
 docs/_pg*.png
+
+# Step-by-step learning notes for me, kept on disk but not part of the submission.
+docs/explained/
