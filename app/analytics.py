@@ -29,6 +29,17 @@ def _odd(value: int) -> int:
     return value if value % 2 == 1 else value + 1
 
 
+def _distance(first: tuple[float, float], second: tuple[float, float]) -> float:
+    """Returns the straight-line distance between two (x, y) points, in pixels.
+
+    Why Pythagoras and not |dx| + |dy|: a diagonal step is genuinely shorter than walking its two
+    sides, and adding the sides would overstate speed for anyone moving at an angle.
+
+    Example: (0, 0) to (30, 40) -> sqrt(900 + 1600) = 50 px.
+    """
+    return float(np.hypot(second[0] - first[0], second[1] - first[1]))
+
+
 @dataclass
 class _DwellEntry:
     """One remembered visit: when this track ID first entered a zone, and when it was last seen.
@@ -115,6 +126,72 @@ class DwellTracker:
         dwell times measured from a completely different video.
         """
         self._entries.clear()
+
+
+class SpeedTracker:
+    """Estimates how fast each tracked person is moving, in pixels per second.
+
+    Why pixels and not km/h: turning pixels into metres needs a camera calibration - where the
+    floor is, how far away it sits, and at what angle. We do not have that, so any km/h figure
+    would be invented. Pixels per second is honest, needs no extra data, and is still comparable
+    inside one clip: a zone where people move at 5 px/s is far more congested than one where they
+    move at 40 px/s, which is exactly the operational question.
+
+    Example: a foot point at (100, 200) at video time 1.0 s, then at (140, 200) at 3.0 s. The
+    distance is 40 px, the elapsed time is 2 s, so the speed is 20 px/s.
+    """
+
+    def __init__(self) -> None:
+        """Starts remembering nobody, which is the correct state for a clip's first frame."""
+        self._last: dict[int, tuple[float, tuple[float, float]]] = {}
+
+    def update(self, now: float, people: list) -> dict[int, float]:
+        """Records where everyone is now and returns the speed of whoever moved since last time.
+
+        Why it returns a dict instead of storing the answer: the caller needs the speeds for this
+        frame's snapshot, and a person seen for the first time has no earlier position, so it is
+        simply absent from the result rather than reported as a false 0 px/s.
+
+        Why people is typed as a plain list: this module only reads .track_id and .foot from each
+        entry, so it stays usable with the real Person dataclass and with test doubles.
+
+        Example: update(1.0, [ID 7 at (100, 200)]) returns {}, and update(3.0, [ID 7 at
+        (140, 200)]) returns {7: 20.0}.
+        """
+        speeds: dict[int, float] = {}
+        # Carry over who was seen before, so a single missed detection does not reset the speed.
+        seen_now = dict(self._last)
+
+        for person in people:
+            track_id = int(person.track_id)
+            foot = (float(person.foot[0]), float(person.foot[1]))
+
+            previous = self._last.get(track_id)
+            # A first sighting has nothing to compare against, so no speed is reported yet.
+            if previous is not None:
+                previous_time, previous_foot = previous
+                elapsed = now - previous_time
+                # Two detections in the same instant would divide by zero; skip rather than crash.
+                if elapsed > 0:
+                    speeds[track_id] = _distance(previous_foot, foot) / elapsed
+
+            seen_now[track_id] = (now, foot)
+
+        # Forget anyone unseen for longer than TRACK_GRACE, so the dict cannot grow forever.
+        self._last = {
+            track_id: entry
+            for track_id, entry in seen_now.items()
+            if now - entry[0] <= config.TRACK_GRACE
+        }
+        return speeds
+
+    def reset(self) -> None:
+        """Forgets every remembered position, which is needed when we switch to another clip.
+
+        Why: track IDs restart at 1 for a new clip, so a remembered position from the old clip
+        would produce a huge fake speed the first time ID 1 reappears.
+        """
+        self._last.clear()
 
 
 class HeatmapAccumulator:

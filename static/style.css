@@ -723,6 +723,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Movement speed under the dwell line: same size and colour, one step quieter in weight. */
+.gauge-speed {
+  margin-top: 2px;
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Status chip ---------- */
 
 .status-chip {

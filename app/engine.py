@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 
 from app import config, db
-from app.analytics import AlertDebouncer, DwellTracker, HeatmapAccumulator
+from app.analytics import AlertDebouncer, DwellTracker, HeatmapAccumulator, SpeedTracker
 from app.vision import Detector, resize_frame
 from app.zones import Zone, count_by_zone, draw_zones, load_zones, status_for
 
@@ -260,6 +260,7 @@ class Engine(threading.Thread):
 
         self.detector.reset()
         dwell = DwellTracker()
+        speeds = SpeedTracker()
         debouncers = {zone.name: AlertDebouncer(zone.name) for zone in zones}
         active_alerts: dict[str, int] = {}   # zone name -> the alert id currently open
         # Busiest count seen since each zone's alert opened, so update_peak writes only on a rise.
@@ -294,6 +295,8 @@ class Engine(threading.Thread):
                                for name, group in grouped.items()}
 
                     dwell.update(now, members)
+                    # Movement velocity for this moment, keyed by track ID. See chapter 4.4.
+                    speed_map = speeds.update(now, people)
                     # One point per person: the same foot pixel the zone test uses.
                     heatmap.add([person.foot for person in people])
 
@@ -303,9 +306,9 @@ class Engine(threading.Thread):
                         self._save_headcounts(counts)
                         next_headcount_at = now + config.HEADCOUNT_INTERVAL
 
-                    snapshot = self._build_snapshot(zones, counts, dwell, now, peak_people,
-                                                    debouncers, active_alerts, source_name,
-                                                    new_alert)
+                    snapshot = self._build_snapshot(zones, counts, dwell, speed_map, grouped,
+                                                    now, peak_people, debouncers, active_alerts,
+                                                    source_name, new_alert)
                     self.state.set(frame=frame, people=people, heat=heatmap.layer(),
                                    snapshot=snapshot)
                     self._record_frame_time(time.perf_counter() - started)
@@ -472,6 +475,7 @@ class Engine(threading.Thread):
         return len(self._frame_times) / total
 
     def _build_snapshot(self, zones: list[Zone], counts: dict[str, int], dwell: DwellTracker,
+                        speeds: dict[int, float], grouped: dict[str, list],
                         now: float, peak_people: int,
                         debouncers: dict[str, AlertDebouncer],
                         active_alerts: dict[str, int], source_name: str,
@@ -482,12 +486,15 @@ class Engine(threading.Thread):
         FastAPI would raise when a value like np.int64(7) reached the encoder. Casting here means
         the snapshot is plain JSON all the way out.
 
+        Why speeds arrive as a track_id -> px/s map and grouped as zone -> people: the per-zone
+        average needs both, and neither can be recovered from the counts alone.
+
         Example shape:
             {"ts": 31.5, "source": "crowded.mp4", "fps": 7.1, "total_people": 7,
              "peak_people": 9,
              "zones": [{"name": "Main Zone", "count": 7, "capacity": 4, "fill": 1.75,
                         "status": "OVER", "over_for": 3.2, "avg_dwell": 12.0,
-                        "max_dwell": 24.0}],
+                        "max_dwell": 24.0, "avg_speed": 18.4}],
              "alerts_active": 1, "new_alert": null}
         """
         zone_list = []
@@ -495,6 +502,10 @@ class Engine(threading.Thread):
             count = int(counts.get(zone.name, 0))
             capacity = int(zone.capacity)
             average, longest = dwell.stats(zone.name, now)
+            # Average only over the people who actually have a speed this frame.
+            zone_speeds = [speeds[person.track_id]
+                           for person in grouped.get(zone.name, [])
+                           if person.track_id in speeds]
             zone_list.append({
                 "name": zone.name,
                 "count": count,
@@ -505,6 +516,7 @@ class Engine(threading.Thread):
                 "over_for": float(debouncers[zone.name].over_for),
                 "avg_dwell": float(average),
                 "max_dwell": float(longest),
+                "avg_speed": float(sum(zone_speeds) / len(zone_speeds)) if zone_speeds else 0.0,
             })
 
         return {

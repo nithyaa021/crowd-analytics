@@ -1,44 +1,69 @@
 # Expected results on the demo clips
 
-Measured with the real pipeline: `Detector` (YOLOv8 nano + ByteTrack), `conf=0.35`, every 2nd frame, frames resized to 640 px wide.
+These are the numbers the real pipeline produces, so you can check the app is behaving
+correctly. Same settings for all three clips: YOLOv8 nano + ByteTrack, `conf=0.35`,
+every 2nd frame analysed, frames resized to 640 px wide.
 
-| Clip | Scenario | Source | Length | Max people | Median people | Fits role | Expected alert |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `normal.mp4` | normal | `36304379.mp4` | 24.4s | 4 | 2 | yes | None - stays under capacity |
-| `mid.mp4` | mid | `14393753.mp4` | 31.1s | 12 | 5 | yes | Maybe - a low-capacity zone can fill up |
-| `crowded.mp4` | crowded | `18516076.mp4` | 45.0s | 15 | 8 | yes | Yes - zone goes over capacity |
+| Clip | Scenario | Length | Max people | Median people | Capacity set in `zones.json` | Expected alert |
+| --- | --- | --- | --- | --- | --- | --- |
+| `normal.mp4` | normal | 24.4 s | 4 | 2 | 4 | **None** — stays under capacity |
+| `mid.mp4` | mid | 31.1 s | 12 | 5 | 5 | **None** — spikes are too short to sustain 3 s |
+| `crowded.mp4` | crowded | 45.0 s | 15 | 8 | 4 | **Yes** — one alert at about 31.5 s |
 
 ## How to read the table
 
-- **Max people** is the busiest single frame; it decides the role. Expected: normal <= 6, mid 7-14, crowded >= 12.
-- **Median people** is the typical frame; it shows how often the scene is busy, not just whether it spikes once.
-- A clip that does not fit is reported, never renamed silently. Replace the raw file or agree a new role name.
+- **Max people** is the busiest single analysed frame across the whole clip.
+- **Median people** is the typical frame, so it shows how often the scene is busy rather than
+  whether it spiked once.
+- **Capacity** is deliberately chosen per clip: `crowded.mp4` is meant to go over so there is an
+  alert to demonstrate, and `normal.mp4` is meant to stay comfortably under so we can prove the
+  app does not raise false alarms.
 
-## Clip details
+## The expected behaviour, in detail
 
-### normal.mp4
+### normal.mp4 — the false-positive check
 
-- Source file: `demo_videos/raw/36304379.mp4`
-- Used stretch: 0.0s to 24.4s (24.4s, cut-free)
-- Written resolution: 1280x720 (downscaled from the original, still 720p or better)
-- First/last preview difference: 18.8 (warning above 35)
+Low density. The zone count hovers around 2 and peaks at 4, which equals capacity but never
+exceeds it. `status_for` returns **NEAR** at 4/4 (80% or more of capacity), never **OVER**.
 
-### mid.mp4
+Result: **0 alerts** over a full loop. This is the test that proves an empty scene does not set
+off the alarm.
 
-- Source file: `demo_videos/raw/14393753.mp4`
-- Used stretch: 0.0s to 31.1s (31.1s, cut-free)
-- Written resolution: 1280x720 (downscaled from the original, still 720p or better)
-- First/last preview difference: 35.4 (warning above 35)
+### mid.mp4 — the near miss
 
-### crowded.mp4
+Busier, median 5, with brief spikes above the capacity of 5. But every spike lasts less than
+`ON_DELAY` (3 s), so `AlertDebouncer` never fires. That is the debouncer doing its job: a
+momentary bump is noise, not a crowd.
 
-- Source file: `demo_videos/raw/18516076.mp4`
-- Used stretch: 0.0s to 45.0s (45.0s, cut-free)
-- Written resolution: 1280x720 (downscaled from the original, still 720p or better)
-- First/last preview difference: 14.5 (warning above 35)
+Result: **0 alerts**.
 
-## Camera stability
+### crowded.mp4 — the demonstration
 
-Each clip is written from a single stretch between detected cuts, so there is no scene
-change inside a clip. The preview number is a raw pixel-change score, which moving
-people raise even when the camera is still; the script warns when it crosses 35, and the preview images were then checked by eye.
+Dense and sustained. The zone holds more than 4 people for well over 3 seconds, starting around
+video time 28.5 s.
+
+Result: **1 alert**, fired at about **31.5 s**, with a peak of **8 / 4**. Because
+`OFF_DELAY` is 5 s and the crowd never fully disperses before the clip ends, the alert stays open
+until the clip stops and is then closed by `_close_alerts`.
+
+Evidence photo: `evidence/alert_1.jpg` — the frame that caused it, with boxes, foot points, the
+zone polygon and an `ALERT 1  31.5s` stamp drawn in.
+
+## Why the clips never cut mid-scene
+
+Each clip is a single continuous stretch, so there is no scene change inside a clip. That keeps
+the zone polygons valid for the whole video — a camera cut would move the floor under the
+polygon and every count would be wrong.
+
+## What to do if your numbers differ slightly
+
+The detector is not bit-for-bit deterministic across machines, and a slower CPU changes how many
+frames finish before the clip ends. Small differences are normal. What must hold:
+
+1. `normal.mp4` and `mid.mp4` produce **no** alerts.
+2. `crowded.mp4` produces **at least one** alert, with a peak above 4.
+3. The headcount chart in the dashboard visibly rises during `crowded.mp4` and stays flat during
+   `normal.mp4`.
+
+If `crowded.mp4` never alerts, the likely cause is a CPU slow enough that the 3-second sustained
+run is not reached; lower `ON_DELAY` in `app/config.py` and note the change.

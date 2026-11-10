@@ -12,7 +12,8 @@
  *
  * Two shapes are worth keeping in mind, because everything below works with one or the other:
  *
- *   snapshot zone (from /ws):  { name, count, capacity, fill, status, over_for, avg_dwell, max_dwell }
+ *   snapshot zone (from /ws):  { name, count, capacity, fill, status, over_for, avg_dwell,
+ *                               max_dwell, avg_speed }
  *   api zone (from /api/zones): { name, capacity, polygon }
  *
  * The snapshot is the live truth. /api/zones only tells us which zones exist and how big they
@@ -165,6 +166,24 @@ function statusIcon(status) {
 function formatDwell(seconds) {
   const value = Number(seconds) || 0;
   return value >= 10 ? `${Math.round(value)} s` : `${value.toFixed(1)} s`;
+}
+
+/**
+ * Formats a movement speed for the gauge.
+ *
+ * Why an em dash for zero: a person seen in only one frame has no previous position, so no speed
+ * can be measured. Showing "0 px/s" would claim the person is frozen, which is a different and
+ * misleading statement. The dash means "not measured yet".
+ *
+ * Example: 18.4 -> "18 px/s"; 5.2 -> "5.2 px/s"; 0 -> "—".
+ *
+ * @param {number} value - speed in pixels per second.
+ * @returns {string} the formatted value with its unit, or a dash.
+ */
+function formatSpeed(value) {
+  const speed = Number(value) || 0;
+  if (speed <= 0) return "—";
+  return speed >= 10 ? `${Math.round(speed)} px/s` : `${speed.toFixed(1)} px/s`;
 }
 
 /**
@@ -406,7 +425,8 @@ function gaugeMarkup(latest) {
   return app.zoneDefs
     .map((definition) => {
       // A zone with no snapshot yet (the first 0.5 s, or a clip that just changed) reads 0/…
-      const live = latest.get(definition.name) || { count: 0, over_for: 0, avg_dwell: 0 };
+      const live = latest.get(definition.name)
+        || { count: 0, over_for: 0, avg_dwell: 0, avg_speed: 0 };
       const count = Number(live.count) || 0;
       const capacity = Number(definition.capacity) || 0;
       const status = live.status || deriveStatus(count, capacity);
@@ -447,6 +467,7 @@ function gaugeMarkup(latest) {
             ${statusIcon(status)}${escapeHtml(status)}
           </span>
           <div class="gauge-dwell">avg ${formatDwell(live.avg_dwell)}</div>
+          <div class="gauge-speed">${formatSpeed(live.avg_speed)}</div>
         </div>`;
     })
     .join("");
