@@ -7,3 +7,6 @@ outputs/
 .env
 # Source downloads are large; SOURCES.csv lets anyone fetch them again.
 demo_videos/raw/
+
+# Unrelated coursework, kept on disk but not part of this repo.
+assignment/
