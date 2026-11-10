@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The content workflow, written out step by step</title>
+    <meta name="description" content="A step-by-step, tool-by-tool description of the AI carousel workflow, with timings, artefacts and failure modes." />
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/base.css" />
+    <link rel="stylesheet" href="../assets/docs.css" />
+    <script defer src="../assets/base.js"></script>
+  </head>
+  <body>
+    <a class="sr-only" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap nav__inner">
+        <a class="brand" href="../index.html">
+          <span class="brand__mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" /></svg>
+          </span>
+          <span>Assignment Round One</span>
+        </a>
+        <nav class="nav__links" id="navLinks" aria-label="Main">
+          <a href="../index.html">Overview</a>
+          <a href="../discovery.html">01 · Discovery</a>
+          <a href="../course.html">02 · Course</a>
+          <a href="../workflow.html">03 · Content</a>
+        </nav>
+        <div class="nav__actions">
+          <a class="btn btn--ghost btn--sm" href="../index.html">Back to site</a>
+          <button class="nav__toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="dochero">
+        <div class="wrap">
+          <p class="eyebrow">Documentation · 03</p>
+          <h1>The carousel workflow, written out</h1>
+          <p class="lede">
+            The same pipeline as deliverable 03, but as an operating manual: what you do,
+            what the machine does, how long it takes, what artefact comes out, and how it
+            fails. Read this if you want to run it rather than look at it.
+          </p>
+        </div>
+      </section>
+
+      <div class="wrap docgrid">
+        <nav class="toc" aria-label="On this page">
+          <span class="toc__label">On this page</span>
+          <a href="#overview">Overview</a>
+          <a href="#setup">One-time setup</a>
+          <a href="#run">Running it</a>
+          <a href="#size">Why 8 slides</a>
+          <a href="#automation">n8n wiring</a>
+          <a href="#failure">Failure modes</a>
+        </nav>
+
+        <article class="prose">
+          <section id="overview">
+            <h2>Overview</h2>
+            <p>
+              The system exists because the bottleneck on a founder's content is not ideas and
+              not writing — it is <strong>layout</strong>. An idea takes two minutes; a decent
+              eight-slide carousel takes two and a half hours, most of it spent nudging text
+              boxes. This pipeline moves the mechanical 90% to machines and keeps the
+              judgement with the founder.
+            </p>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>Stage</th><th>Who</th><th>Time</th><th>Artefact</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>1 · Capture</td><td>Founder</td><td>3 min</td><td>Transcript</td></tr>
+                <tr><td>2 · Research</td><td>AI</td><td>6 min</td><td>Structured brief</td></tr>
+                <tr><td>3 · Copy</td><td>AI</td><td>8 min</td><td>Slide JSON</td></tr>
+                <tr><td>4 · Visual direction</td><td>AI</td><td>5 min</td><td>Template + layout table</td></tr>
+                <tr><td>5 · Assembly</td><td>AI + tool</td><td>10 min</td><td>Editable Figma file</td></tr>
+                <tr><td>6 · Review &amp; publish</td><td>Founder</td><td>6 min</td><td>Published post</td></tr>
+              </tbody>
+            </table></div>
+            <p>
+              Total: <strong>38 minutes</strong>, of which the founder personally spends nine.
+            </p>
+          </section>
+
+          <section id="setup">
+            <h2>One-time setup (about 90 minutes, once)</h2>
+            <p>
+              This is the part people skip, and then wonder why the output is inconsistent.
+              Five artefacts, each of which is an input to a prompt later.
+            </p>
+
+            <h3>1. Brand token sheet</h3>
+            <p>One page, four colours, two fonts, three spacing values, one radius. Example:</p>
+            <div class="callout">
+              <div class="callout__bar"></div>
+              <p>
+                <code>ink #12211C</code> · <code>paper #FBF8F2</code> ·
+                <code>green #0E5A46</code> · <code>coral #E8613F</code><br />
+                Display: Georgia. UI: Segoe UI. Radius 20px. Outer padding 96px on 1080×1350.
+              </p>
+            </div>
+            <p>
+              Without this, the model invents a new palette by slide six and the set stops
+              looking like one brand.
+            </p>
+
+            <h3>2. Four slide templates</h3>
+            <p>
+              Named, so prompts can reference them by name: <strong>T1 Dark Hook</strong>,
+              <strong>T2 Numbered Point</strong>, <strong>T3 Proof</strong>,
+              <strong>T4 Brand CTA</strong>. Build them once in Figma as one component with
+              four variants.
+            </p>
+
+            <h3>3. Three voice samples</h3>
+            <p>
+              Three real paragraphs the founder actually wrote — a WhatsApp message, an email,
+              a caption. Not "our brand voice is friendly and professional". The model needs
+              rhythm, not adjectives.
+            </p>
+
+            <h3>4. An idea inbox</h3>
+            <p>
+              A Notion database with five fields: Idea, Status, Brief, Slide JSON, Published
+              URL. One row per voice note. Status moves left to right; nothing is a blank page.
+            </p>
+
+            <h3>5. A rejection log</h3>
+            <p>
+              Every post the founder rejected and one line on why. This is the only real
+              training data the system gets, and after a month it becomes the most useful
+              document in the workspace.
+            </p>
+          </section>
+
+          <section id="run">
+            <h2>Running it, once per post</h2>
+
+            <h3>Stage 1 — capture (3 min)</h3>
+            <p>
+              Record a voice note into Notion. Speak the idea messily; do not structure it.
+              Run it through Whisper (free, local) or type three sentences if that's faster.
+              Paste the transcript into the row's Idea field.
+            </p>
+
+            <h3>Stage 2 — research (6 min)</h3>
+            <p>
+              Paste the transcript into the research prompt from the workflow page. You get a
+              brief with a claim, evidence marked <code>[VERIFIED]</code> or
+              <code>[OPINION]</code>, a counter-argument, and a number if one exists. Anything
+              marked <code>[VERIFIED]</code> gets a Perplexity check before it survives.
+            </p>
+            <div class="callout callout--warn">
+              <div class="callout__bar"></div>
+              <p>
+                <strong>The step people skip</strong>
+                If the brief says "no defensible number available", that is the model doing its
+                job. Do not ask it again until it produces a number. Rewrite the claim instead.
+              </p>
+            </div>
+
+            <h3>Stage 3 — copy (8 min)</h3>
+            <p>
+              Paste the brief and the three voice samples into the copy prompt. The output is
+              a JSON array of eight objects — role, headline, body, kicker. Read it out loud.
+              If a headline needs a comma to make sense, it is too long.
+            </p>
+
+            <h3>Stage 4 — visual direction (5 min)</h3>
+            <p>
+              Paste the JSON into the visual prompt with the token sheet. You get a table
+              assigning each slide a template and a layout note. Check the alternation: dark,
+              light, light, light, light, dark, dark, brand. If two darks sit together, the set
+              loses its rhythm when swiped.
+            </p>
+
+            <h3>Stage 5 — assembly (10 min)</h3>
+            <p>
+              In Figma, one component with eight instances. Override the text from the JSON.
+              Use variables for colour and spacing so a brand change updates all eight at once.
+              If the founder will edit without help, use Canva with a locked brand kit instead.
+            </p>
+
+            <h3>Stage 6 — review and publish (6 min)</h3>
+            <p>Three questions, out loud, in this order:</p>
+            <ol>
+              <li>Does slide 1 make someone stop scrolling, or does it describe the post?</li>
+              <li>Is every claim one I'd defend to a vet, a customer, or a lawyer?</li>
+              <li>Would I read this on my own phone, standing up, in traffic?</li>
+            </ol>
+            <p>
+              Fix anything that fails, export at 1080×1350 for Instagram and 1080×1080 for
+              LinkedIn, schedule, done.
+            </p>
+          </section>
+
+          <section id="size">
+            <h2>Why eight slides, and why those word limits</h2>
+            <p>
+              Eight is the short end of what Instagram allows (up to 20) and the long end of
+              what people finish. Completion data across most accounts shows a cliff after
+              eight. Fewer than six and the topic feels thin; more than ten and the last slides
+              are seen by almost nobody.
+            </p>
+            <ul>
+              <li><strong>Headline ≤ 9 words</strong> — fits two lines at 32px on a 1080-wide canvas without shrinking.</li>
+              <li><strong>Body ≤ 22 words</strong> — roughly three lines at 18px, which is the point where people stop reading a caption-shaped paragraph.</li>
+              <li><strong>Kicker ≤ 3 words, uppercase</strong> — a scanning aid, not a sentence.</li>
+              <li><strong>CTA ≤ 12 words, one ask</strong> — two asks split the click.</li>
+            </ul>
+          </section>
+
+          <section id="automation">
+            <h2>How the n8n wiring works</h2>
+            <p>
+              The pipeline is runnable by hand from day one. n8n is added only when the founder
+              is doing it three or more times a week, because automation of a process you have
+              not yet run manually just automates confusion.
+            </p>
+            <ol>
+              <li><strong>Trigger</strong> — Notion database row changes status to "Ready".</li>
+              <li><strong>HTTP node</strong> — send the transcript to the research prompt via the Claude API.</li>
+              <li><strong>Code node</strong> — extract the brief, pass it to the copy prompt, parse the JSON response.</li>
+              <li><strong>HTTP node</strong> — send the JSON plus the token sheet to the visual prompt.</li>
+              <li><strong>Figma API node</strong> — or the Canva bulk-create endpoint — populate the eight frames.</li>
+              <li><strong>Notion node</strong> — write the design link back to the row and set status to "In review".</li>
+              <li><strong>Slack / WhatsApp node</strong> — notify the founder that a draft is ready.</li>
+            </ol>
+            <p>
+              There is deliberately no publish node. The final export and schedule stays manual.
+            </p>
+          </section>
+
+          <section id="failure">
+            <h2>Failure modes, and the fix for each</h2>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>Failure</th><th>Fix</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Output sounds like AI</td>
+                  <td>Refresh voice samples every ten posts; keep a banned-phrases list in the system prompt ("journey", "in today's world", "game-changer").</td>
+                </tr>
+                <tr>
+                  <td>Slides overflow the frame</td>
+                  <td>The word limits exist for this. If a headline breaks, the model ignored the constraint — regenerate rather than shrink the type.</td>
+                </tr>
+                <tr>
+                  <td>Set looks incoherent</td>
+                  <td>Template alternation was skipped. Enforce the dark/light rhythm in stage 04's prompt.</td>
+                </tr>
+                <tr>
+                  <td>An invented statistic ships</td>
+                  <td>Because the <code>[VERIFIED]</code> check was skipped. This is the one failure with real reputational cost; automate a Perplexity lookup for every verified item.</td>
+                </tr>
+                <tr>
+                  <td>n8n dies silently</td>
+                  <td>Daily heartbeat message that fires only when the queue is empty. Silence is the signal.</td>
+                </tr>
+                <tr>
+                  <td>Founder stops using it</td>
+                  <td>Almost always because stage 1 became a form. Keep capture as a voice note; the moment it needs structure, the idea dies.</td>
+                </tr>
+              </tbody>
+            </table></div>
+          </section>
+
+          <div class="docnav">
+            <a class="btn btn--ghost btn--sm" href="tools-and-stack.html">← Tools &amp; stack</a>
+            <a class="btn btn--sm" href="../workflow.html">See the sample carousel →</a>
+          </div>
+        </article>
+      </div>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap">
+        <div class="foot__base" style="margin-top: 0; border-top: 0; padding-top: 0">
+          <span>Documentation · Workflow</span>
+          <span><a href="../index.html">Back to the three prototypes</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

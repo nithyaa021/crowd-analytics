@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Practo for Animals — Find care for your animal, fast</title>
+    <meta
+      name="description"
+      content="Find veterinary clinics, hospitals, boarding, diagnostics, ambulances and animal NGOs near you. Emergency-first discovery prototype."
+    />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <link rel="stylesheet" href="assets/discovery.css" />
+    <script defer src="assets/base.js"></script>
+    <script defer src="assets/discovery.js"></script>
+  </head>
+  <body>
+    <a class="sr-only" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap nav__inner">
+        <a class="brand" href="index.html">
+          <span class="brand__mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" />
+            </svg>
+          </span>
+          <span>practo<span style="color: var(--green-600)">for animals</span></span>
+        </a>
+
+        <nav class="nav__links" id="navLinks" aria-label="Main">
+          <a href="discovery.html" aria-current="page">Find care</a>
+          <a href="#services">Services</a>
+          <a href="#trust">How we verify</a>
+          <a href="#list">For providers</a>
+        </nav>
+
+        <div class="nav__actions">
+          <a class="btn btn--ghost btn--sm" href="#emergency">
+            <span class="dot" style="color: var(--coral)"></span>
+            Emergency
+          </a>
+          <a class="btn btn--sm" href="#list">List your business</a>
+          <button class="nav__toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ================= HERO + SEARCH ================= -->
+      <section class="hero">
+        <div class="wrap">
+          <div class="hero__top">
+            <div class="hero__copy">
+              <p class="eyebrow">Animal care, found properly</p>
+              <h1>
+                Your animal can't tell you what's wrong.<br />
+                <em>We can help you find who can.</em>
+              </h1>
+              <p class="lede">
+                Clinics, hospitals, boarding, labs, ambulances and shelters — verified,
+                with the details that actually matter at 2am.
+              </p>
+            </div>
+
+            <!-- Live stat block: proves the marketplace has depth at a glance. -->
+            <div class="hero__stats" aria-label="Coverage at a glance">
+              <div>
+                <span class="hero__stat-value" data-count="1240" data-suffix="+">0</span>
+                <span class="hero__stat-label">Verified providers</span>
+              </div>
+              <div>
+                <span class="hero__stat-value" data-count="38">0</span>
+                <span class="hero__stat-label">Cities live</span>
+              </div>
+              <div>
+                <span class="hero__stat-value" data-count="4.6" data-decimals="1" data-suffix="★">0</span>
+                <span class="hero__stat-label">Avg. owner rating</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ---------- The search panel: the single most important control ---------- -->
+          <div class="searchpanel" id="searchPanel">
+            <form class="searchform" id="searchForm" novalidate>
+              <div class="searchform__field searchform__field--grow">
+                <label for="q" class="searchform__label">What do you need?</label>
+                <div class="searchform__input">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                  <input
+                    id="q"
+                    name="q"
+                    type="search"
+                    placeholder="Vet, 24h hospital, boarding, X-ray, ambulance…"
+                    autocomplete="off"
+                    aria-describedby="q-hint"
+                  />
+                </div>
+                <p id="q-hint" class="searchform__hint">Try “boarding”, “24 hours” or “cat specialist”.</p>
+              </div>
+
+              <div class="searchform__field">
+                <label for="loc" class="searchform__label">Where</label>
+                <div class="searchform__input">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11Z" /><circle cx="12" cy="10" r="2.6" /></svg>
+                  <input id="loc" name="loc" type="text" value="Indiranagar, Bengaluru" autocomplete="off" />
+                </div>
+                <p class="searchform__hint">Use my location</p>
+              </div>
+
+              <div class="searchform__field">
+                <label for="species" class="searchform__label">For</label>
+                <div class="searchform__input">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" /></svg>
+                  <select id="species" name="species">
+                    <option value="all">Any animal</option>
+                    <option value="dog">Dog</option>
+                    <option value="cat">Cat</option>
+                    <option value="bird">Bird</option>
+                    <option value="rabbit">Rabbit / small pet</option>
+                    <option value="exotic">Reptile / exotic</option>
+                  </select>
+                </div>
+                <p class="searchform__hint">Species-specific care only</p>
+              </div>
+
+              <button class="btn btn--lg searchform__go" type="submit">
+                Find care
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+              </button>
+            </form>
+
+            <div class="searchpanel__foot">
+              <div class="row wraprow" style="gap: 8px">
+                <span class="small muted" style="margin-right: 2px">Popular:</span>
+                <button class="chip chip--xs" type="button" data-quick="emergency">24h emergency</button>
+                <button class="chip chip--xs" type="button" data-quick="vaccination">Vaccination</button>
+                <button class="chip chip--xs" type="button" data-quick="boarding">Boarding</button>
+                <button class="chip chip--xs" type="button" data-quick="ambulance">Ambulance</button>
+                <button class="chip chip--xs" type="button" data-quick="ngo">Low-cost / NGO</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SERVICE CATEGORIES ================= -->
+      <section class="section--tight" id="services" style="padding-bottom: 8px">
+        <div class="wrap">
+          <div class="between row wraprow" style="gap: 14px; margin-bottom: 18px">
+            <h2 style="font-size: clamp(1.35rem, 2.4vw, 1.75rem)">What are you looking for?</h2>
+            <p class="small muted">Six categories cover 90% of what owners search for.</p>
+          </div>
+
+          <div class="services" role="group" aria-label="Care categories">
+            <button class="service" type="button" data-service="vet">
+              <span class="service__icon service__icon--green">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v5a6 6 0 0 0 12 0V4" /><path d="M9 4v5a3 3 0 0 0 6 0V4" /><path d="M12 15v5" /><path d="M8 20h8" /></svg>
+              </span>
+              <span class="service__name">Vet clinics</span>
+              <span class="service__meta">412 nearby</span>
+            </button>
+
+            <button class="service" type="button" data-service="hospital">
+              <span class="service__icon service__icon--coral">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7l8-4 8 4v14" /><path d="M12 9v6M9 12h6" /></svg>
+              </span>
+              <span class="service__name">Hospitals</span>
+              <span class="service__meta">96 · 24h care</span>
+            </button>
+
+            <button class="service" type="button" data-service="boarding">
+              <span class="service__icon service__icon--amber">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10 12 3l9 7" /><path d="M5 9v11h14V9" /><path d="M9.5 20v-5h5v5" /></svg>
+              </span>
+              <span class="service__name">Boarding</span>
+              <span class="service__meta">208 sitters</span>
+            </button>
+
+            <button class="service" type="button" data-service="diagnostics">
+              <span class="service__icon service__icon--blue">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6" /><path d="M10 3v6.2L5.6 17A3 3 0 0 0 8.2 21h7.6a3 3 0 0 0 2.6-4.4L14 9.2V3" /><path d="M7.6 14h8.8" /></svg>
+              </span>
+              <span class="service__name">Diagnostics</span>
+              <span class="service__meta">Labs &amp; imaging</span>
+            </button>
+
+            <button class="service" type="button" data-service="ambulance">
+              <span class="service__icon service__icon--coral">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16V8h11v8" /><path d="M14 11h4l3 3v2h-7" /><circle cx="7" cy="18" r="1.8" /><circle cx="17" cy="18" r="1.8" /><path d="M8.5 11v3M7 12.5h3" /></svg>
+              </span>
+              <span class="service__name">Ambulance</span>
+              <span class="service__meta">Pet transport</span>
+            </button>
+
+            <button class="service" type="button" data-service="ngo">
+              <span class="service__icon service__icon--green">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" /></svg>
+              </span>
+              <span class="service__name">NGOs &amp; shelters</span>
+              <span class="service__meta">Free / low cost</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= EMERGENCY STRIP ================= -->
+      <section class="section--tight" id="emergency" style="padding-top: 26px">
+        <div class="wrap">
+          <div class="emergency">
+            <div class="emergency__left">
+              <span class="emergency__pulse" aria-hidden="true"></span>
+              <div>
+                <h3 style="color: inherit">Is it an emergency right now?</h3>
+                <p class="small" style="margin-top: 4px; color: #f7d9cf; max-width: 56ch">
+                  Breathing trouble, bleeding, poisoning, a car accident, or a cat that
+                  hasn't urinated in 12 hours — skip the filters and call.
+                </p>
+              </div>
+            </div>
+            <div class="emergency__actions">
+              <button class="btn btn--white" type="button" id="emergencyBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v2.1a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 3.2 2 2 0 0 1 4.1 1h2.1a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.4 2.1L7.3 8.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" /></svg>
+                Show 24h &amp; ambulance
+              </button>
+              <a class="btn btn--ghost" href="#results" style="color: #fff; border-color: rgba(255, 255, 255, 0.4)">See all emergency care</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= RESULTS ================= -->
+      <section class="section" id="results" style="padding-top: 34px">
+        <div class="wrap">
+          <div class="results__head">
+            <div>
+              <p class="eyebrow" id="resultsEyebrow">Near Indiranagar, Bengaluru</p>
+              <h2 style="margin-top: 8px; font-size: clamp(1.5rem, 2.6vw, 2rem)">
+                <span id="resultCount">0</span> places can help
+              </h2>
+            </div>
+
+            <div class="results__sort">
+              <label for="sort" class="small muted">Sort by</label>
+              <select id="sort" class="select">
+                <option value="recommended">Recommended</option>
+                <option value="rating">Highest rated</option>
+                <option value="distance">Closest first</option>
+                <option value="response">Fastest response</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="results__grid">
+            <!-- ---------- Filter rail ---------- -->
+            <aside class="filters" aria-label="Filter results">
+              <div class="filters__head">
+                <h3 style="font-size: 1rem">Filters</h3>
+                <button class="filters__reset" type="button" id="resetFilters">Reset</button>
+              </div>
+
+              <fieldset class="filtergroup">
+                <legend>Service</legend>
+                <div class="filterchips" id="serviceFilters">
+                  <button class="chip is-active" type="button" data-filter="service" data-value="all">All</button>
+                  <button class="chip" type="button" data-filter="service" data-value="vet">Vet clinic</button>
+                  <button class="chip" type="button" data-filter="service" data-value="hospital">Hospital</button>
+                  <button class="chip" type="button" data-filter="service" data-value="boarding">Boarding</button>
+                  <button class="chip" type="button" data-filter="service" data-value="diagnostics">Diagnostics</button>
+                  <button class="chip" type="button" data-filter="service" data-value="ambulance">Ambulance</button>
+                  <button class="chip" type="button" data-filter="service" data-value="ngo">NGO</button>
+                </div>
+              </fieldset>
+
+              <fieldset class="filtergroup">
+                <legend>Availability</legend>
+                <label class="toggle">
+                  <input type="checkbox" id="fOpenNow" />
+                  <span class="toggle__track" aria-hidden="true"></span>
+                  <span class="toggle__label">Open right now</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="f24h" />
+                  <span class="toggle__track" aria-hidden="true"></span>
+                  <span class="toggle__label">24-hour emergency</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" id="fHome" />
+                  <span class="toggle__track" aria-hidden="true"></span>
+                  <span class="toggle__label">Home visit available</span>
+                </label>
+              </fieldset>
+
+              <fieldset class="filtergroup">
+                <legend>Treated species</legend>
+                <div class="filterchips" id="speciesFilters">
+                  <button class="chip is-active" type="button" data-filter="species" data-value="all">Any</button>
+                  <button class="chip" type="button" data-filter="species" data-value="dog">Dog</button>
+                  <button class="chip" type="button" data-filter="species" data-value="cat">Cat</button>
+                  <button class="chip" type="button" data-filter="species" data-value="bird">Bird</button>
+                  <button class="chip" type="button" data-filter="species" data-value="rabbit">Rabbit</button>
+                  <button class="chip" type="button" data-filter="species" data-value="exotic">Exotic</button>
+                </div>
+              </fieldset>
+
+              <fieldset class="filtergroup">
+                <legend>Owner rating</legend>
+                <div class="filterchips" id="ratingFilters">
+                  <button class="chip is-active" type="button" data-filter="rating" data-value="0">Any</button>
+                  <button class="chip" type="button" data-filter="rating" data-value="4">4.0+</button>
+                  <button class="chip" type="button" data-filter="rating" data-value="4.5">4.5+</button>
+                </div>
+              </fieldset>
+
+              <fieldset class="filtergroup">
+                <legend>Cost</legend>
+                <div class="filterchips" id="costFilters">
+                  <button class="chip is-active" type="button" data-filter="cost" data-value="all">Any</button>
+                  <button class="chip" type="button" data-filter="cost" data-value="low">Low cost</button>
+                  <button class="chip" type="button" data-filter="cost" data-value="free">Free / NGO</button>
+                </div>
+              </fieldset>
+
+              <!-- Correction flow lives in the rail so it's findable, not buried. -->
+              <div class="filters__correct">
+                <p class="small" style="font-weight: 650">Spotted something wrong?</p>
+                <p class="small muted" style="margin-top: 3px">
+                  Wrong number, closed down, moved location — tell us and we fix it.
+                </p>
+                <button class="btn btn--ghost btn--sm btn--block" type="button" id="correctionBtn" style="margin-top: 10px">
+                  Submit a correction
+                </button>
+              </div>
+            </aside>
+
+            <!-- ---------- Result cards ---------- -->
+            <div>
+              <div class="activefilters" id="activeFilters" aria-live="polite"></div>
+              <div class="cards" id="cards"></div>
+
+              <!-- Empty state must always explain what to do next. -->
+              <div class="empty" id="empty" hidden>
+                <div class="empty__icon" aria-hidden="true">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                </div>
+                <h3>Nothing matches all of those</h3>
+                <p class="small muted" style="max-width: 42ch; margin-inline: auto; margin-top: 6px">
+                  Drop one filter and try again — or widen the area. Emergency care is
+                  usually the strictest filter to satisfy.
+                </p>
+                <button class="btn btn--quiet btn--sm" type="button" id="emptyReset" style="margin-top: 14px">Clear all filters</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TRUST ================= -->
+      <section class="section" id="trust" style="background: var(--cream-deep); border-block: 1px solid var(--line)">
+        <div class="wrap">
+          <div class="trust__grid">
+            <div>
+              <p class="eyebrow">Why the list is trustworthy</p>
+              <h2 style="margin-top: 10px">A directory is only as good as its last verification</h2>
+              <p class="lede" style="margin-top: 14px; max-width: 44ch">
+                Every provider carries a verification date and a source. When something
+                changes, owners can correct it in two taps — that's the mechanism that
+                keeps a directory from rotting.
+              </p>
+
+              <div class="trust__list">
+                <div class="trust__item">
+                  <span class="trust__num">01</span>
+                  <div>
+                    <h3>Registration checked</h3>
+                    <p>State veterinary council number, or NGO 12A/80G certificate.</p>
+                  </div>
+                </div>
+                <div class="trust__item">
+                  <span class="trust__num">02</span>
+                  <div>
+                    <h3>Contact confirmed by call</h3>
+                    <p>A human calls the listed number every 90 days. "Verified 6 days ago" is a date, not a badge.</p>
+                  </div>
+                </div>
+                <div class="trust__item">
+                  <span class="trust__num">03</span>
+                  <div>
+                    <h3>Owners keep it honest</h3>
+                    <p>Every card has "Submit a correction". Three reports auto-flag a listing for re-check.</p>
+                  </div>
+                </div>
+                <div class="trust__item">
+                  <span class="trust__num">04</span>
+                  <div>
+                    <h3>Paid placement is labelled</h3>
+                    <p>Sponsored listings say "Sponsored" and never hide the rating or distance.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="trust__card card">
+              <div class="trust__cardhead">
+                <span class="badge badge--coral"><span class="dot"></span> Live coverage</span>
+                <span class="small muted">Updated today</span>
+              </div>
+              <div class="trust__cities">
+                <div class="trust__city">
+                  <span>Bengaluru</span>
+                  <span class="trust__bar"><span style="width: 100%"></span></span>
+                  <strong>386</strong>
+                </div>
+                <div class="trust__city">
+                  <span>Mumbai</span>
+                  <span class="trust__bar"><span style="width: 74%"></span></span>
+                  <strong>284</strong>
+                </div>
+                <div class="trust__city">
+                  <span>Delhi NCR</span>
+                  <span class="trust__bar"><span style="width: 63%"></span></span>
+                  <strong>241</strong>
+                </div>
+                <div class="trust__city">
+                  <span>Pune</span>
+                  <span class="trust__bar"><span style="width: 47%"></span></span>
+                  <strong>182</strong>
+                </div>
+                <div class="trust__city">
+                  <span>Hyderabad</span>
+                  <span class="trust__bar"><span style="width: 38%"></span></span>
+                  <strong>147</strong>
+                </div>
+              </div>
+              <div class="trust__note">
+                <strong>Next up:</strong> Chennai, Kolkata and Jaipur have enough inbound
+                searches to justify onboarding.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= PROVIDER / B2B CTA ================= -->
+      <section class="section" id="list">
+        <div class="wrap">
+          <div class="b2b">
+            <div class="b2b__col">
+              <span class="badge badge--amber">For providers</span>
+              <h2 style="margin-top: 14px; font-size: clamp(1.5rem, 2.6vw, 2rem)">List your business</h2>
+              <p class="small" style="margin-top: 10px; color: var(--ink-soft); max-width: 40ch">
+                Free listing, verified badge after one call. You get a profile page, an
+                enquiry inbox and — if you want it — a booking link. We never publish your
+                number without your consent.
+              </p>
+              <form class="b2b__form" id="listForm" novalidate>
+                <div class="b2b__row">
+                  <label class="field">
+                    <span class="field__label">Business name</span>
+                    <input class="field__input" id="bizName" type="text" placeholder="e.g. Paws &amp; Claws Clinic" required />
+                  </label>
+                  <label class="field">
+                    <span class="field__label">Phone</span>
+                    <input class="field__input" id="bizPhone" type="tel" placeholder="10-digit mobile" required />
+                  </label>
+                </div>
+                <label class="field">
+                  <span class="field__label">What do you offer?</span>
+                  <select class="field__input" id="bizType">
+                    <option>Veterinary clinic</option>
+                    <option>Hospital / 24h emergency</option>
+                    <option>Boarding / daycare</option>
+                    <option>Diagnostics / imaging</option>
+                    <option>Ambulance service</option>
+                    <option>NGO / shelter</option>
+                  </select>
+                </label>
+                <button class="btn btn--block" type="submit">Request a free listing</button>
+                <p class="small muted" id="listNote">We reply within one working day.</p>
+              </form>
+            </div>
+
+            <div class="b2b__col b2b__col--alt">
+              <span class="badge badge--grey">For everyone</span>
+              <h2 style="margin-top: 14px; font-size: clamp(1.5rem, 2.6vw, 2rem)">
+                Something out of date?
+              </h2>
+              <p class="small" style="margin-top: 10px; color: var(--ink-soft); max-width: 40ch">
+                A wrong number on this page could cost an animal its life. If you spot a
+                problem, tell us — no account needed, no form fields you have to guess.
+              </p>
+              <form class="b2b__form" id="correctForm" novalidate>
+                <label class="field">
+                  <span class="field__label">Which listing?</span>
+                  <input class="field__input" id="corrName" type="text" placeholder="Clinic or provider name" required />
+                </label>
+                <label class="field">
+                  <span class="field__label">What's wrong?</span>
+                  <select class="field__input" id="corrType">
+                    <option>Phone number is wrong</option>
+                    <option>Closed down / moved</option>
+                    <option>Wrong opening hours</option>
+                    <option>Not actually 24 hours</option>
+                    <option>Wrong species treated</option>
+                    <option>Something else</option>
+                  </select>
+                </label>
+                <button class="btn btn--ghost btn--block" type="submit">Submit correction</button>
+                <p class="small muted" id="corrNote">We confirm every correction before changing a listing.</p>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap">
+        <div class="foot__grid">
+          <div>
+            <a class="brand" href="index.html" style="margin-bottom: 12px">
+              <span class="brand__mark" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" /></svg>
+              </span>
+              <span>practo<span style="color: var(--green-600)">for animals</span></span>
+            </a>
+            <p class="small muted" style="max-width: 32ch">
+              A discovery prototype for finding animal care. All providers, ratings and
+              distances shown here are illustrative.
+            </p>
+          </div>
+          <div>
+            <p class="foot__head">Find care</p>
+            <ul>
+              <li><a href="#" data-quick="vet">Vet clinics</a></li>
+              <li><a href="#" data-quick="hospital">24h hospitals</a></li>
+              <li><a href="#" data-quick="boarding">Boarding</a></li>
+              <li><a href="#" data-quick="ambulance">Ambulance</a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="foot__head">Providers</p>
+            <ul>
+              <li><a href="#list">List your business</a></li>
+              <li><a href="#list">Submit a correction</a></li>
+              <li><a href="#trust">Verification policy</a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="foot__head">Assignment</p>
+            <ul>
+              <li><a href="index.html">All three prototypes</a></li>
+              <li><a href="course.html">02 · Course landing</a></li>
+              <li><a href="workflow.html">03 · Content system</a></li>
+              <li><a href="docs/approach.html">How I built it</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="foot__base">
+          <span>Prototype · Deliverable 01 of 03</span>
+          <span>Not affiliated with Practo. Built for an internship assignment.</span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

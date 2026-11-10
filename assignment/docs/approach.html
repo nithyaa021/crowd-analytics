@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How I built it — decisions, trade-offs and open questions</title>
+    <meta name="description" content="The reasoning behind the three prototypes: what I chose, what I rejected, what I'd do differently, and what I'd ask the founder." />
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/base.css" />
+    <link rel="stylesheet" href="../assets/docs.css" />
+    <script defer src="../assets/base.js"></script>
+  </head>
+  <body>
+    <a class="sr-only" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap nav__inner">
+        <a class="brand" href="../index.html">
+          <span class="brand__mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" /></svg>
+          </span>
+          <span>Assignment Round One</span>
+        </a>
+
+        <nav class="nav__links" id="navLinks" aria-label="Main">
+          <a href="../index.html">Overview</a>
+          <a href="../discovery.html">01 · Discovery</a>
+          <a href="../course.html">02 · Course</a>
+          <a href="../workflow.html">03 · Content</a>
+        </nav>
+
+        <div class="nav__actions">
+          <a class="btn btn--ghost btn--sm" href="../index.html">Back to site</a>
+          <button class="nav__toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="dochero">
+        <div class="wrap">
+          <p class="eyebrow">Documentation · 01</p>
+          <h1>How I built it, and what I'd argue with</h1>
+          <p class="lede">
+            The brief asked for three prototypes. This page is the part that isn't visible
+            on screen: why each decision went the way it did, what I deliberately did not
+            build, and the four questions I'd want answered before turning any of this into
+            a real product.
+          </p>
+          <div class="dochero__meta">
+            <span class="chip chip--static">4–5 hour scope</span>
+            <span class="chip chip--static">Front-end only</span>
+            <span class="chip chip--static">No dependencies</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="wrap docgrid">
+        <nav class="toc" aria-label="On this page">
+          <span class="toc__label">On this page</span>
+          <a href="#approach">Approach</a>
+          <a href="#decisions">Key decisions</a>
+          <a href="#rejected">What I rejected</a>
+          <a href="#technical">Technical notes</a>
+          <a href="#accessibility">Accessibility</a>
+          <a href="#next">With more time</a>
+          <a href="#questions">Questions for you</a>
+        </nav>
+
+        <article class="prose">
+          <section id="approach">
+            <h2>The approach in one paragraph</h2>
+            <p>
+              I treated the three deliverables as one product family with three audiences,
+              not three unrelated designs. A person who opens the animal-care prototype
+              should recognise the course page as coming from the same studio. That meant
+              building a shared design system first — colour tokens, a type scale, spacing
+              rules, button and card states — and then expressing each deliverable as a
+              different <em>rhythm</em> within it.
+            </p>
+            <p>
+              The second decision was to make every prototype genuinely interactive rather
+              than a picture of an interface. A wireframe proves you can draw boxes. A
+              working filter, a two-step form that validates, and a carousel whose copy
+              lives in a data array prove you understand how the thing actually behaves.
+            </p>
+
+            <div class="statrow">
+              <div>
+                <strong>3</strong>
+                <span>Working prototypes</span>
+              </div>
+              <div>
+                <strong>0</strong>
+                <span>Runtime dependencies</span>
+              </div>
+              <div>
+                <strong>1</strong>
+                <span>Design system, shared</span>
+              </div>
+            </div>
+          </section>
+
+          <section id="decisions">
+            <h2>The decisions I'd defend in an interview</h2>
+
+            <h3>1. Search leads the page, not the hero copy</h3>
+            <p>
+              Most marketplace homepages open with a big headline and a "Browse categories"
+              grid. That is wrong for this product. Someone visiting Practo for Animals has
+              an animal in front of them, possibly unwell, and a specific need. So the search
+              panel sits above the fold, pre-filled with location, with species as a
+              first-class field rather than a filter buried later. The category tiles exist
+              as a shortcut for people who don't know the right words.
+            </p>
+
+            <h3>2. Emergency is a separate mode, not a filter</h3>
+            <p>
+              An emergency is a different job from a checkup — different urgency, different
+              decision criteria, different emotional state. Burying "24 hours" as one
+              checkbox among nine treats it as a preference. Instead there's a dedicated
+              module with a persistent phone icon in the nav that switches the whole result
+              set to emergency care. This is the single highest-stakes interaction on the
+              page, so it gets its own path.
+            </p>
+
+            <h3>3. Trust is expressed as freshness, not badges</h3>
+            <p>
+              Every directory says "verified". The word means nothing without a date and a
+              mechanism. So each card says how recently it was checked ("Verified 3 days
+              ago" / "Re-check due"), and the trust section explains the process: registration
+              check, a human phone call every 90 days, and an owner correction flow that
+              auto-flags after three reports. That last part is the actual product insight —
+              a directory decays, and the correction path is what slows the decay.
+            </p>
+
+            <h3>4. The course form is two steps, and the order is deliberate</h3>
+            <p>
+              Asking "where are you in your career?" before asking for a phone number reads
+              like a survey and hurts completion. Asking the same question <em>after</em>
+              the number is given reads like personalisation. The form collects two fields
+              first, then one qualifying question that routes the lead into a batch. Same
+              data, different sequence, measurably different completion rate.
+            </p>
+
+            <h3>5. "Pay after completion" is a positioning choice, not a pricing gimmick</h3>
+            <p>
+              A course that charges upfront is structurally incentivised to enrol people, not
+              to teach them. Showing that risk sits with the provider is a trust signal that
+              costs nothing to state and is hard for competitors to copy without changing
+              their model.
+            </p>
+
+            <h3>6. The content system keeps a human at the last step</h3>
+            <p>
+              It would be easy — and wrong — to present a fully automated publish pipeline.
+              The marginal saving is under two minutes, and the downside is publishing an
+              unchecked medical claim. So stage 06 is deliberately manual, with a three-item
+              checklist. Automating assembly and automating judgement are different
+              propositions.
+            </p>
+          </section>
+
+          <section id="rejected">
+            <h2>What I chose not to build, and why</h2>
+
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr>
+                  <th>Considered</th>
+                  <th>Why I left it out</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Provider detail page</td>
+                  <td>
+                    The brief asks for a homepage / search page. A detail page would be the
+                    next screen, but building it half-heartedly would have weakened the
+                    search experience that carries the whole deliverable.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Map view</td>
+                  <td>
+                    A real map needs tiles and a key, which breaks the offline requirement
+                    and adds no design insight at this stage. Distance and area name carry
+                    enough of the information.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Login / accounts</td>
+                  <td>
+                    Adding auth to a 4-hour prototype is decoration. Owners search without
+                    an account on every comparable platform.
+                  </td>
+                </tr>
+                <tr>
+                  <td>AI-generated hero images</td>
+                  <td>
+                    Illustrated iconography in the brand's own colour family is more
+                    coherent, loads instantly, and avoids the "AI stock photo" look that
+                    would undercut the credibility of a healthcare brand.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Real clinic data</td>
+                  <td>
+                    Scraping real listings would be a licensing and accuracy problem. The
+                    sixteen sample providers are modelled on the real shape of Indian
+                    veterinary listings so the design is tested against realistic strings,
+                    but they are clearly labelled illustrative.
+                  </td>
+                </tr>
+                <tr>
+                  <td>A four-step lead form with budget</td>
+                  <td>
+                    Every extra field costs completion. For a free seat reservation, name
+                    and phone is the whole commitment.
+                  </td>
+                </tr>
+              </tbody>
+            </table></div>
+          </section>
+
+          <section id="technical">
+            <h2>Technical notes</h2>
+            <p>
+              Everything is plain HTML, CSS and ES2020 JavaScript. There is no build step, no
+              framework and no CDN. The reason is not ideology — it is that a reviewer should
+              be able to double-click <code>index.html</code> and have it work, on a laptop,
+              offline, with no instructions.
+            </p>
+
+            <h3>File structure</h3>
+            <ul>
+              <li><code>index.html</code> — the submission hub</li>
+              <li><code>discovery.html</code> + <code>assets/discovery.*</code> — deliverable 01</li>
+              <li><code>course.html</code> + <code>assets/course.*</code> — deliverable 02</li>
+              <li><code>workflow.html</code> + <code>assets/workflow.*</code> — deliverable 03</li>
+              <li><code>assets/base.css</code> — shared design tokens and components</li>
+              <li><code>assets/base.js</code> — shared nav, reveal, toast, counters</li>
+              <li><code>docs/</code> — these three written pages</li>
+            </ul>
+
+            <h3>CSS architecture</h3>
+            <p>
+              <code>base.css</code> owns custom properties (colour, radius, shadow, type),
+              the reset, typography, and the components used on more than one page: buttons,
+              chips, badges, nav, footer, toast. Each page stylesheet owns only what is
+              unique to it. That means the brand colour is defined once, and a page-specific
+              rule can never accidentally restyle another page.
+            </p>
+
+            <h3>JavaScript architecture</h3>
+            <p>
+              Each page script is a single IIFE with a named reading order at the top: data,
+              state, render, events. The discovery page keeps all filter state in one object
+              and has a single <code>render()</code> function that reads from it — so there is
+              no possibility of the UI and the state disagreeing. The carousel keeps its
+              slides in a data array that deliberately mirrors the JSON contract from the
+              workflow's prompt pack.
+            </p>
+
+            <div class="callout">
+              <div class="callout__bar"></div>
+              <p>
+                <strong>Prototype boundary</strong>
+                Forms validate and confirm, but nothing is transmitted. Each submit logs the
+                captured object to the console so you can see exactly what a backend would
+                receive.
+              </p>
+            </div>
+          </section>
+
+          <section id="accessibility">
+            <h2>Accessibility, specifically</h2>
+            <ul>
+              <li>Every interactive control is a real <code>button</code>, <code>a</code> or <code>input</code> — no clickable divs.</li>
+              <li>Focus is visible everywhere, and tab order follows reading order.</li>
+              <li>The carousel responds to arrow keys and exposes <code>aria-roledescription="slide"</code> per slide.</li>
+              <li>Form errors are announced with <code>aria-invalid</code> and a text message, not colour alone.</li>
+              <li>Step changes in the lead form move focus to the new heading.</li>
+              <li><code>prefers-reduced-motion</code> disables every transition and animation.</li>
+              <li>If JavaScript fails, content is still visible — the reveal animation only hides elements once JS has confirmed it is running.</li>
+              <li>Colour pairings were checked for contrast; the coral is only used on white for large or bold text.</li>
+            </ul>
+          </section>
+
+          <section id="next">
+            <h2>What I'd do with a second day</h2>
+            <ol>
+              <li>
+                <strong>Provider detail page</strong> — hours, photos, doctors, reviews, and a
+                "request appointment" flow. This is the obvious next screen and the one that
+                makes the search experience complete.
+              </li>
+              <li>
+                <strong>Real usability test</strong> — five people, one task: "find a 24-hour
+                clinic for a cat, right now". I'd expect the species + emergency combination
+                to be the friction point, and I'd want data rather than my own opinion.
+              </li>
+              <li>
+                <strong>Course page A/B variant</strong> — one version with the form inline in
+                the hero, one with it after the proof section. My hypothesis is that early
+                placement wins for students and loses for team buyers.
+              </li>
+              <li>
+                <strong>Actually run the workflow once end to end</strong> in n8n and time it,
+                so the 38-minute claim is measured rather than estimated.
+              </li>
+            </ol>
+          </section>
+
+          <section id="questions">
+            <h2>Questions I'd ask before building for real</h2>
+            <p>
+              These are the four things I could not resolve from the brief alone. I made a
+              defensible call on each and noted it, but the answers would change the design.
+            </p>
+            <ol>
+              <li>
+                <strong>Is Practo for Animals a directory or a booking platform?</strong> If
+                bookings are in scope, every card needs an availability signal and the whole
+                page re-centres on scheduling rather than discovery.
+              </li>
+              <li>
+                <strong>How is provider data sourced?</strong> Founder-led onboarding, partner
+                feeds, or owner submissions? That decides whether the correction flow is a
+                side feature or the core of data quality.
+              </li>
+              <li>
+                <strong>Who is the AI education audience first — students or working
+                professionals?</strong> The page currently serves both with one message, which
+                is a compromise. Splitting it would sharpen the proof section considerably.
+              </li>
+              <li>
+                <strong>Does the founder actually want to appear on camera or in voice?</strong>
+                The content system assumes a personal voice is an asset. If the brand should
+                feel institutional, stage 03's voice samples become brand guidelines instead.
+              </li>
+            </ol>
+          </section>
+
+          <div class="docnav">
+            <a class="btn btn--ghost btn--sm" href="../index.html">← Back to the submission</a>
+            <a class="btn btn--sm" href="tools-and-stack.html">Next: tools &amp; stack →</a>
+          </div>
+        </article>
+      </div>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap">
+        <div class="foot__base" style="margin-top: 0; border-top: 0; padding-top: 0">
+          <span>Documentation · How I built it</span>
+          <span><a href="../index.html">Back to the three prototypes</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

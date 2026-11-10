@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tools &amp; tech stack — the short version</title>
+    <meta name="description" content="Recommended tools, technology stack, CTAs and automation integrations for the three deliverables, in one reference table." />
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/base.css" />
+    <link rel="stylesheet" href="../assets/docs.css" />
+    <script defer src="../assets/base.js"></script>
+  </head>
+  <body>
+    <a class="sr-only" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap nav__inner">
+        <a class="brand" href="../index.html">
+          <span class="brand__mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" /></svg>
+          </span>
+          <span>Assignment Round One</span>
+        </a>
+        <nav class="nav__links" id="navLinks" aria-label="Main">
+          <a href="../index.html">Overview</a>
+          <a href="../discovery.html">01 · Discovery</a>
+          <a href="../course.html">02 · Course</a>
+          <a href="../workflow.html">03 · Content</a>
+        </nav>
+        <div class="nav__actions">
+          <a class="btn btn--ghost btn--sm" href="../index.html">Back to site</a>
+          <button class="nav__toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="dochero">
+        <div class="wrap">
+          <p class="eyebrow">Documentation · 02</p>
+          <h1>Tools, stack, CTAs and automation</h1>
+          <p class="lede">
+            The brief asked for a brief explanation of recommended tools, technology stack,
+            CTAs and the automation workflow. This is that page — one table per deliverable,
+            with the rejected alternative named every time.
+          </p>
+        </div>
+      </section>
+
+      <div class="wrap docgrid">
+        <nav class="toc" aria-label="On this page">
+          <span class="toc__label">On this page</span>
+          <a href="#built">What this site is built with</a>
+          <a href="#d1">01 · Discovery tools</a>
+          <a href="#d2">02 · Course tools</a>
+          <a href="#d3">03 · Content tools</a>
+          <a href="#ctamap">CTA map</a>
+          <a href="#costs">Running costs</a>
+        </nav>
+
+        <article class="prose">
+          <section id="built">
+            <h2>What this submission itself is built with</h2>
+            <p>
+              Plain HTML, CSS and ES2020 JavaScript, written by hand. No React, no Tailwind CDN,
+              no bundler, no external fonts. Total payload is a few hundred kilobytes, and the
+              whole thing opens from <code>file://</code>.
+            </p>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>Layer</th><th>Choice and reason</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Markup</td>
+                  <td>Semantic HTML5 — <code>main</code>, <code>section</code>, <code>fieldset</code>, <code>details</code>. Gets accessibility and browser behaviour for free instead of reimplementing it.</td>
+                </tr>
+                <tr>
+                  <td>Styling</td>
+                  <td>Hand-written CSS with custom properties. A design system in ~450 lines beats a utility framework here because the point is to demonstrate design judgement, not class-name recall.</td>
+                </tr>
+                <tr>
+                  <td>Interaction</td>
+                  <td>Vanilla JS, one IIFE per page. The only stateful piece is the discovery filter object and the carousel index — far too small to justify a framework.</td>
+                </tr>
+                <tr>
+                  <td>Type</td>
+                  <td>Georgia (display) + Segoe UI (interface), both system-resident on Windows. Zero network requests and no layout shift.</td>
+                </tr>
+                <tr>
+                  <td>Icons</td>
+                  <td>Inline SVG paths. No icon font, no sprite sheet, and they inherit colour via <code>currentColor</code>.</td>
+                </tr>
+              </tbody>
+            </table></div>
+            <div class="callout">
+              <div class="callout__bar"></div>
+              <p>
+                <strong>Why not Figma for the deliverable?</strong> A Figma file is a picture of
+                an interface; it cannot demonstrate a filter that filters. Given a choice
+                between a beautiful static frame and a slightly less beautiful working page,
+                the brief's weighting of "technical execution" and "product thinking" favours
+                the working page.
+              </p>
+            </div>
+          </section>
+
+          <section id="d1">
+            <h2>01 · Discovery MVP — production stack</h2>
+            <p>
+              If this were built for real rather than prototyped, this is what I'd ship.
+            </p>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>Concern</th><th>Recommendation</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Frontend</td>
+                  <td>Next.js on Vercel. Server-rendered provider pages matter for SEO — people search "vet near me", not "practo for animals".</td>
+                </tr>
+                <tr>
+                  <td>Search</td>
+                  <td>Postgres with <code>pg_trgm</code> for fuzzy name matching, plus Meilisearch once listings pass ~5,000. Typo tolerance on clinic names is not optional.</td>
+                </tr>
+                <tr>
+                  <td>Geo</td>
+                  <td>PostGIS for distance. "2.4 km away" must be a real query, not a stored number.</td>
+                </tr>
+                <tr>
+                  <td>Maps</td>
+                  <td>Mapbox GL — generous free tier, and the styling can match the brand palette unlike Google's.</td>
+                </tr>
+                <tr>
+                  <td>Data quality</td>
+                  <td>A verification queue with a 90-day re-check cron, and a correction table that auto-flags a listing after three reports.</td>
+                </tr>
+                <tr>
+                  <td>Analytics</td>
+                  <td>PostHog (self-hostable) tracking search → card click → call tap. The call tap is the real conversion.</td>
+                </tr>
+              </tbody>
+            </table></div>
+          </section>
+
+          <section id="d2">
+            <h2>02 · Course landing page — stack</h2>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>Concern</th><th>Recommendation</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Build</td>
+                  <td>Same as above — Next.js. If the founder needs to edit copy weekly, Framer is the pragmatic alternative.</td>
+                </tr>
+                <tr>
+                  <td>Forms</td>
+                  <td>Tally embedded, or a Next.js route handler writing to the CRM. Tally because it handles partial-submission tracking for free.</td>
+                </tr>
+                <tr>
+                  <td>CRM</td>
+                  <td>Notion database to start (zero cost, founder already uses it), migrating to HubSpot Free at ~500 leads/month.</td>
+                </tr>
+                <tr>
+                  <td>Messaging</td>
+                  <td>WhatsApp Business API via Interakt or Wati — the audience is in India and opens WhatsApp, not email.</td>
+                </tr>
+                <tr>
+                  <td>Payments</td>
+                  <td>Razorpay, with the "pay after completion" model implemented as a deferred link sent at week three.</td>
+                </tr>
+                <tr>
+                  <td>Analytics</td>
+                  <td>PostHog funnels on the five stages shown on the landing page; each stage is a named event, not a pageview.</td>
+                </tr>
+              </tbody>
+            </table></div>
+          </section>
+
+          <section id="d3">
+            <h2>03 · Content system — the automation stack</h2>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>Stage</th><th>Tool</th><th>Why</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Capture</td>
+                  <td>Notion + Whisper</td>
+                  <td>Already open daily; local transcription is free and private.</td>
+                </tr>
+                <tr>
+                  <td>Research</td>
+                  <td>Claude + Perplexity</td>
+                  <td>Structure from Claude, live citations from Perplexity. Never let a model invent a statistic.</td>
+                </tr>
+                <tr>
+                  <td>Copy</td>
+                  <td>Claude</td>
+                  <td>Reliable JSON output and adherence to hard word limits.</td>
+                </tr>
+                <tr>
+                  <td>Visual direction</td>
+                  <td>Claude + brand token sheet</td>
+                  <td>The token sheet is the anti-slop mechanism: fixed colours, fixed spacing.</td>
+                </tr>
+                <tr>
+                  <td>Assembly</td>
+                  <td>Figma (variables + components)</td>
+                  <td>Editable in ten seconds per slide. Canva is the fallback if the founder edits without help.</td>
+                </tr>
+                <tr>
+                  <td>Orchestration</td>
+                  <td>n8n (self-hosted)</td>
+                  <td>Free at volume, and the workflow survives a subscription lapse.</td>
+                </tr>
+                <tr>
+                  <td>Review</td>
+                  <td>Human checklist</td>
+                  <td>Three questions, six minutes. Non-negotiable.</td>
+                </tr>
+                <tr>
+                  <td>Publish</td>
+                  <td>Meta Business Suite + Buffer</td>
+                  <td>Native scheduling, no account risk from automation bots.</td>
+                </tr>
+              </tbody>
+            </table></div>
+          </section>
+
+          <section id="ctamap">
+            <h2>CTA map — every call to action and its job</h2>
+            <p>
+              A page with four equal CTAs has none. Each of these has one job and one
+              placement, and the hierarchy is visible in the styling: coral solid for the
+              primary, outline for the secondary, text-link for the tertiary.
+            </p>
+
+            <h3>Deliverable 01 — Discovery</h3>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>CTA</th><th>Audience / job</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Find care</td><td>Owner, primary. The single most-used control on the page.</td></tr>
+                <tr><td>Show 24h &amp; ambulance</td><td>Owner in an emergency. Bypasses all filtering.</td></tr>
+                <tr><td>Call now</td><td>Owner, conversion. The real business event.</td></tr>
+                <tr><td>List your business</td><td>Provider, supply side. Free listing, no paywall.</td></tr>
+                <tr><td>Submit a correction</td><td>Anyone. Protects data quality; appears on every card and in the filter rail.</td></tr>
+              </tbody>
+            </table></div>
+
+            <h3>Deliverable 02 — Course</h3>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>CTA</th><th>Audience / job</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Save a seat — free</td><td>Primary, repeated five times. "Free" removes the price objection at the click.</td></tr>
+                <tr><td>Watch the 90-second tour</td><td>Low-commitment secondary for people not ready to give a number.</td></tr>
+                <tr><td>Start with week 1</td><td>Committed-to-nothing entry point.</td></tr>
+                <tr><td>Talk to us</td><td>Team buyers only. Pre-selects the "team" answer in the form.</td></tr>
+                <tr><td>Ask a question</td><td>Objection handler near the FAQ, not a separate contact page.</td></tr>
+              </tbody>
+            </table></div>
+
+            <h3>Deliverable 03 — Content system</h3>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>CTA</th><th>Audience / job</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Copy (prompt buttons)</td><td>Founder. Makes the workflow immediately reusable.</td></tr>
+                <tr><td>Slide navigation</td><td>Reviewer. Lets them judge the set as a set.</td></tr>
+                <tr><td>Review checkboxes</td><td>Founder, daily. The gate that keeps quality.</td></tr>
+              </tbody>
+            </table></div>
+          </section>
+
+          <section id="costs">
+            <h2>What it costs to actually run</h2>
+            <div class="tablewrap"><table class="dtable">
+              <thead>
+                <tr><th>Component</th><th>Monthly</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Claude (content pipeline)</td><td>₹1,700 (~$20 Pro)</td></tr>
+                <tr><td>Perplexity (sourcing)</td><td>₹1,700 (~$20 Pro)</td></tr>
+                <tr><td>Figma</td><td>₹0 — free tier is enough for one editor</td></tr>
+                <tr><td>n8n</td><td>₹0 — self-hosted on a ₹350 VPS</td></tr>
+                <tr><td>Notion</td><td>₹0 — free personal</td></tr>
+                <tr><td>Buffer / Meta Suite</td><td>₹0 — native scheduling</td></tr>
+              </tbody>
+            </table></div>
+            <p>
+              Realistic all-in: <strong>₹3,500–4,000 per month</strong> for roughly four
+              carousels a week, versus a freelance designer at ₹2,000–4,000 per carousel. The
+              break-even is about two posts a month.
+            </p>
+          </section>
+
+          <div class="docnav">
+            <a class="btn btn--ghost btn--sm" href="approach.html">← How I built it</a>
+            <a class="btn btn--sm" href="workflow.html">Next: the workflow, written out →</a>
+          </div>
+        </article>
+      </div>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap">
+        <div class="foot__base" style="margin-top: 0; border-top: 0; padding-top: 0">
+          <span>Documentation · Tools &amp; stack</span>
+          <span><a href="../index.html">Back to the three prototypes</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

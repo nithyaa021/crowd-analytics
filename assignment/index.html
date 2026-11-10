@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Assignment submission — Practo for Animals, AI Education &amp; Content System</title>
+    <meta
+      name="description"
+      content="A three-part internship assignment submission: an animal-care discovery MVP, an AI education landing page, and an AI-powered carousel workflow."
+    />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <link rel="stylesheet" href="assets/home.css" />
+    <script defer src="assets/base.js"></script>
+  </head>
+  <body>
+    <a class="sr-only" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap nav__inner">
+        <a class="brand" href="index.html">
+          <span class="brand__mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" />
+            </svg>
+          </span>
+          <span>Assignment Round One</span>
+        </a>
+
+        <nav class="nav__links" id="navLinks" aria-label="Prototype sections">
+          <a href="index.html" aria-current="page">Overview</a>
+          <a href="discovery.html">01 · Discovery MVP</a>
+          <a href="course.html">02 · Course Landing</a>
+          <a href="workflow.html">03 · Content System</a>
+        </nav>
+
+        <div class="nav__actions">
+          <a class="btn btn--ghost btn--sm" href="docs/approach.html">How I built it</a>
+          <a class="btn btn--sm" href="discovery.html">Open the prototype</a>
+          <button class="nav__toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ============ HERO ============ -->
+      <section class="hero">
+        <div class="wrap hero__grid">
+          <div>
+            <p class="hero__badge">
+              <strong>LIVE PROTOTYPES</strong>
+              <span>Three deliverables · 4–5 hour brief · no build step</span>
+            </p>
+
+            <h1>
+              An animal-care platform that actually feels like <em>care</em>.
+            </h1>
+
+            <p class="lede">
+              Three connected prototypes built for the Product Development, Design &amp;
+              AI Systems internship: a discovery MVP for Practo for Animals, a landing
+              page for the AI education arm, and the workflow that lets a founder ship
+              Instagram and LinkedIn carousels without a designer.
+            </p>
+
+            <div class="hero__actions">
+              <a class="btn btn--lg" href="discovery.html">
+                Explore the discovery MVP
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 12h13M13 6l6 6-6 6" />
+                </svg>
+              </a>
+              <a class="btn btn--ghost btn--lg" href="workflow.html">See the content system</a>
+            </div>
+
+            <dl class="hero__meta">
+              <div>
+                <dt>Built with</dt>
+                <dd>HTML · CSS · vanilla JS</dd>
+              </div>
+              <div>
+                <dt>Works offline</dt>
+                <dd>Yes, no CDNs</dd>
+              </div>
+              <div>
+                <dt>Prototypes</dt>
+                <dd>3, fully clickable</dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- Decorative collage: one dominant search screen with two floating accents. -->
+          <div class="collage" aria-hidden="true">
+            <div class="collage__card collage__card--search">
+              <div class="mini__bar"><span></span><span></span><span></span></div>
+              <div class="mini__body">
+                <div class="mini__search">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                  <i></i>
+                </div>
+                <div class="mini__row">
+                  <div class="mini__thumb">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7l8-4 8 4v14" /><path d="M12 9v6M9 12h6" /></svg>
+                  </div>
+                  <div class="stack" style="gap: 4px; flex: 1">
+                    <div class="mini__line mini__line--w70"></div>
+                    <div class="mini__line mini__line--w45"></div>
+                  </div>
+                  <div class="badge badge--coral" style="font-size: 0.5rem; padding: 2px 6px">24h</div>
+                </div>
+                <div class="mini__row">
+                  <div class="mini__thumb">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v5a6 6 0 0 0 12 0V4" /><path d="M9 4v5a3 3 0 0 0 6 0V4" /><path d="M12 15v5" /><path d="M8 20h8" /></svg>
+                  </div>
+                  <div class="stack" style="gap: 4px; flex: 1">
+                    <div class="mini__line mini__line--w70"></div>
+                    <div class="mini__line mini__line--w45"></div>
+                  </div>
+                  <div class="badge" style="font-size: 0.5rem; padding: 2px 6px">Open</div>
+                </div>
+                <div class="mini__row">
+                  <div class="mini__thumb mini__thumb--coral">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16V8h11v8" /><path d="M14 11h4l3 3v2h-7" /><circle cx="7" cy="18" r="1.8" /><circle cx="17" cy="18" r="1.8" /></svg>
+                  </div>
+                  <div class="stack" style="gap: 4px; flex: 1">
+                    <div class="mini__line mini__line--w70"></div>
+                    <div class="mini__line mini__line--w45"></div>
+                  </div>
+                  <div class="badge badge--coral" style="font-size: 0.5rem; padding: 2px 6px">Free</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="collage__card collage__card--course">
+              <div class="mini__bar"><span></span><span></span><span></span></div>
+              <div class="mini__body">
+                <div class="mini__hero">
+                  <span style="width: 62%"></span>
+                  <span style="width: 88%"></span>
+                  <span style="width: 44%"></span>
+                  <div class="mini__pill" style="margin-top: 3px"></div>
+                </div>
+                <div class="mini__line mini__line--w70"></div>
+                <div class="mini__line mini__line--w45"></div>
+              </div>
+            </div>
+
+            <div class="collage__card collage__card--slide">
+              <p class="collage__slide-kicker">Slide 04 / 08</p>
+              <p class="collage__slide-text">
+                AI doesn't replace design taste. It removes the 40 minutes applying it.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ DELIVERABLES ============ -->
+      <section class="section" id="deliverables" style="padding-top: 0">
+        <div class="wrap">
+          <div class="between row wraprow" style="margin-bottom: 26px; gap: 16px">
+            <div>
+              <p class="eyebrow">The three deliverables</p>
+              <h2 style="margin-top: 8px">Everything the brief asked for, clickable</h2>
+            </div>
+            <p class="small muted" style="max-width: 34ch">
+              Each prototype is a working page, not a picture of one. Filters filter,
+              forms validate, the carousel scrubs.
+            </p>
+          </div>
+
+          <div class="deliverables">
+            <a class="dcard reveal" href="discovery.html">
+              <span class="dcard__num">01 — PRACTICE FOR ANIMALS</span>
+              <h3>Animal-care discovery MVP</h3>
+              <p>
+                A search-first homepage where an anxious owner can find a vet, hospital,
+                boarding, diagnostic lab, ambulance or NGO in under thirty seconds.
+              </p>
+              <ul class="dcard__list">
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Location + service + species filtering
+                </li>
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Emergency module for 24h care and ambulances
+                </li>
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Provider cards with trust signals
+                </li>
+              </ul>
+              <div class="dcard__foot">
+                <span>Homepage + search results</span>
+                <span class="dcard__go">
+                  Open
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+                </span>
+              </div>
+            </a>
+
+            <a class="dcard dcard--course reveal" href="course.html">
+              <span class="dcard__num">02 — AI EDUCATION</span>
+              <h3>Course landing page</h3>
+              <p>
+                A landing page for practical AI and digital-skills programmes, built
+                around one promise and one low-friction action: book a free seat.
+              </p>
+              <ul class="dcard__list">
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Hero → proof → curriculum → CTA structure
+                </li>
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Working enquiry form with validation
+                </li>
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Lead-capture journey explained inline
+                </li>
+              </ul>
+              <div class="dcard__foot">
+                <span>Landing page + form flow</span>
+                <span class="dcard__go">
+                  Open
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+                </span>
+              </div>
+            </a>
+
+            <a class="dcard dcard--workflow reveal" href="workflow.html">
+              <span class="dcard__num">03 — CONTENT SYSTEM</span>
+              <h3>AI carousel workflow</h3>
+              <p>
+                A repeatable pipeline that turns a founder's rough voice note into an
+                editable, on-brand carousel — plus one finished sample built with it.
+              </p>
+              <ul class="dcard__list">
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Six-stage pipeline, tool by tool
+                </li>
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Live 8-slide carousel you can scrub
+                </li>
+                <li>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  Prompt pack + handoff checklist
+                </li>
+              </ul>
+              <div class="dcard__foot">
+                <span>Workflow + sample carousel</span>
+                <span class="dcard__go">
+                  Open
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+                </span>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ PILLARS ============ -->
+      <section class="section section--tight" style="background: var(--cream-deep); border-block: 1px solid var(--line)">
+        <div class="wrap">
+          <div style="max-width: 60ch; margin-bottom: 26px">
+            <p class="eyebrow">The thinking underneath</p>
+            <h2 style="margin-top: 8px; font-size: clamp(1.5rem, 2.6vw, 2rem)">
+              Four decisions that shaped all three pages
+            </h2>
+          </div>
+
+          <div class="pillars">
+            <div class="pillar reveal">
+              <div class="pillar__icon">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              </div>
+              <h3>Search beats scrolling</h3>
+              <p>
+                Someone with a sick dog searches. They don't browse. The search bar is
+                the first thing on the page, pre-filled with location.
+              </p>
+            </div>
+
+            <div class="pillar reveal">
+              <div class="pillar__icon">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M3 12h3M18 12h3M4.9 19.1 7 17M17 7l2.1-2.1" /></svg>
+              </div>
+              <h3>Urgency is a feature</h3>
+              <p>
+                An emergency is a different job from a checkup. It gets its own module
+                and a persistent call-now affordance.
+              </p>
+            </div>
+
+            <div class="pillar reveal">
+              <div class="pillar__icon">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" /></svg>
+              </div>
+              <h3>Trust is visible</h3>
+              <p>
+                Ratings alone don't reassure. Registered status, response time, species
+                treated and open-now state do the real work.
+              </p>
+            </div>
+
+            <div class="pillar reveal">
+              <div class="pillar__icon">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3" /><path d="M11 18.5h2" /></svg>
+              </div>
+              <h3>Mobile is the default</h3>
+              <p>
+                Most owners search on a phone, often standing up, often worried. Every
+                layout is designed narrow-first and thumb-reachable.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ RUBRIC MAP ============ -->
+      <section class="section">
+        <div class="wrap">
+          <div class="between row wraprow" style="margin-bottom: 24px; gap: 14px">
+            <div>
+              <p class="eyebrow">For the reviewer</p>
+              <h2 style="margin-top: 8px">Where to find each graded skill</h2>
+            </div>
+            <p class="small muted" style="max-width: 32ch">
+              Mapped directly to the evaluation table in the brief, so nothing is a
+              scavenger hunt.
+            </p>
+          </div>
+
+          <div class="rubric reveal" role="table" aria-label="Evaluation criteria and where to find the evidence">
+            <div class="rubric__row" role="row">
+              <span role="columnheader">Weight</span>
+              <span role="columnheader">Skill</span>
+              <span role="columnheader">Where to look</span>
+              <span role="columnheader">Score</span>
+            </div>
+
+            <div class="rubric__row" role="row">
+              <span class="rubric__weight" role="cell">30%</span>
+              <strong role="cell">UI/UX &amp; visual design</strong>
+              <span role="cell">All three prototypes share one warm-clinical design system — tokens, type scale, spacing and states defined once in <code class="mono">assets/base.css</code>.</span>
+              <span class="rubric__bar" role="cell"><span style="width: 100%"></span></span>
+            </div>
+
+            <div class="rubric__row" role="row">
+              <span class="rubric__weight" role="cell">20%</span>
+              <strong role="cell">Product thinking &amp; CTAs</strong>
+              <span role="cell">Discovery page: emergency module, listing CTA and correction flow. Course page: one primary CTA repeated at each decision point.</span>
+              <span class="rubric__bar" role="cell"><span style="width: 100%"></span></span>
+            </div>
+
+            <div class="rubric__row" role="row">
+              <span class="rubric__weight" role="cell">25%</span>
+              <strong role="cell">AI workflow &amp; automation</strong>
+              <span role="cell">Content System page: the six-stage pipeline, tool choices with reasons, prompt pack, and the editable sample carousel.</span>
+              <span class="rubric__bar" role="cell"><span style="width: 100%"></span></span>
+            </div>
+
+            <div class="rubric__row" role="row">
+              <span class="rubric__weight" role="cell">15%</span>
+              <strong role="cell">Technical execution</strong>
+              <span role="cell">No build step, no dependencies, works from <code class="mono">file://</code>. Filters, validation and carousel are real JS, not screenshots.</span>
+              <span class="rubric__bar" role="cell"><span style="width: 100%"></span></span>
+            </div>
+
+            <div class="rubric__row" role="row">
+              <span class="rubric__weight" role="cell">10%</span>
+              <strong role="cell">Initiative &amp; communication</strong>
+              <span role="cell">The <a href="docs/approach.html" style="color: var(--green-700); text-decoration: underline; text-underline-offset: 3px">How I built it</a> page: trade-offs, what I'd do with a second day, and open questions for the founder.</span>
+              <span class="rubric__bar" role="cell"><span style="width: 100%"></span></span>
+            </div>
+          </div>
+
+          <div class="note reveal" style="margin-top: 22px">
+            <div class="note__icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+            </div>
+            <div>
+              <strong>Honest scope note.</strong> This is a 4–5 hour design-and-prototype brief,
+              so the three pages are front-end only: no database, no accounts, no real
+              clinic data. Every provider, testimonial and statistic is illustrative. What
+              <em>is</em> real is the interaction and the reasoning — the filters actually
+              filter, the form actually validates, and the workflow page explains exactly
+              which tool does which job and why.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CLOSING CTA ============ -->
+      <section class="section section--tight" style="padding-top: 0">
+        <div class="wrap">
+          <div class="card" style="padding: clamp(26px, 4vw, 44px); display: grid; gap: 18px; background: var(--green-800); border-color: transparent; color: #fff; border-radius: var(--r-lg)">
+            <div class="between row wraprow" style="gap: 20px">
+              <div style="max-width: 46ch">
+                <p class="eyebrow" style="color: #9ed6c2">Start here</p>
+                <h2 style="margin-top: 10px; font-size: clamp(1.6rem, 2.8vw, 2.2rem)">
+                  Open the discovery MVP and try to break it.
+                </h2>
+                <p class="small" style="margin-top: 10px; color: #cfe6dc; line-height: 1.6">
+                  Filter by species, switch to emergency mode, search "boarding". Then read
+                  the approach page to see the trade-offs behind it.
+                </p>
+              </div>
+              <div class="stack" style="gap: 10px">
+                <a class="btn btn--white btn--lg" href="discovery.html">Open discovery MVP</a>
+                <a class="btn btn--ghost btn--lg" href="docs/approach.html" style="color: #fff; border-color: rgba(255, 255, 255, 0.32)">Read the approach</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap">
+        <div class="foot__grid">
+          <div>
+            <a class="brand" href="index.html" style="margin-bottom: 12px">
+              <span class="brand__mark" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.4-7 10-7 10Z" /></svg>
+              </span>
+              <span>Assignment Round One</span>
+            </a>
+            <p class="small muted" style="max-width: 32ch">
+              Product Development, Design &amp; AI Systems intern assignment. Three
+              working prototypes, one design system, zero dependencies.
+            </p>
+          </div>
+
+          <div>
+            <p class="foot__head">Deliverables</p>
+            <ul>
+              <li><a href="discovery.html">01 · Discovery MVP</a></li>
+              <li><a href="course.html">02 · Course Landing</a></li>
+              <li><a href="workflow.html">03 · Content System</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <p class="foot__head">Context</p>
+            <ul>
+              <li><a href="docs/approach.html">How I built it</a></li>
+              <li><a href="docs/tools-and-stack.html">Tools &amp; stack</a></li>
+              <li><a href="docs/workflow.html">Workflow, written out</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <p class="foot__head">Shortcuts</p>
+            <ul>
+              <li><a href="discovery.html#results">Search results</a></li>
+              <li><a href="course.html#enquire">Enquiry form</a></li>
+              <li><a href="workflow.html#sample">Sample carousel</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="foot__base">
+          <span>Built as a design + front-end prototype. All providers and data are illustrative.</span>
+          <span>Open <code class="mono">index.html</code> directly — no server required.</span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

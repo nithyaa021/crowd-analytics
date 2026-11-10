@@ -1,0 +1,599 @@
+/* ==========================================================================
+   home.css — styles unique to the submission hub (index.html).
+   Why: the hub needs a "cover page" feel that the working prototypes should
+   not have, so its layout lives apart from base.css.
+   ========================================================================== */
+
+/* ---------- Hero ---------- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(52px, 7vw, 86px) clamp(46px, 6vw, 74px);
+}
+
+/* Two soft radial washes keep the cream page from looking flat. */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: -30% -10% auto -10%;
+  height: 620px;
+  background:
+    radial-gradient(46% 52% at 22% 30%, rgba(21, 121, 94, 0.1), transparent 70%),
+    radial-gradient(38% 44% at 82% 18%, rgba(232, 97, 63, 0.11), transparent 70%);
+  pointer-events: none;
+}
+
+.hero__grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+  gap: clamp(30px, 4vw, 62px);
+  align-items: center;
+}
+
+.hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--r-pill);
+  background: #fff;
+  border: 1px solid var(--line);
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.hero__badge strong {
+  background: var(--green-700);
+  color: #fff;
+  border-radius: var(--r-pill);
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.hero h1 {
+  margin-top: 20px;
+}
+
+.hero h1 em {
+  font-style: normal;
+  color: var(--green-700);
+  position: relative;
+  white-space: nowrap;
+}
+
+/* Hand-drawn underline: a curved SVG stroke, not a border. */
+.hero h1 em::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.12em;
+  height: 0.34em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 12' preserveAspectRatio='none'%3E%3Cpath d='M2 8c40-6 96-7 196-3' stroke='%23e8613f' stroke-width='3.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat center / 100% 100%;
+  opacity: 0.85;
+}
+
+.hero .lede {
+  margin-top: 20px;
+  max-width: 46ch;
+}
+
+.hero__actions {
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+}
+
+.hero__meta {
+  margin-top: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.hero__meta div {
+  display: grid;
+  gap: 1px;
+}
+
+.hero__meta dt {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.hero__meta dd {
+  margin: 0;
+  font-size: 0.93rem;
+  font-weight: 600;
+}
+
+/* ---------- Layered device collage ----------
+   Composition: one dominant search-results browser card, with a carousel slide
+   floating over its bottom-left corner and a course badge floating top-right.
+   A single focal card reads far cleaner than three equal cards fighting for
+   space, and it mirrors the real product hierarchy. */
+.collage {
+  position: relative;
+  /* An explicit width is required: `margin-inline: auto` stops a grid item from
+     stretching, and every child is absolutely positioned, so without this the
+     box collapses to zero and the whole collage disappears. */
+  width: 100%;
+  max-width: 460px;
+  /* Slightly wider than tall: the stacked cards read better in a landscape box
+     beside the headline than in a square one. The ratio is tuned so the slide
+     overlaps the search card instead of floating below it. */
+  aspect-ratio: 1 / 0.68;
+  margin-inline: auto;
+}
+
+.collage__card {
+  position: absolute;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+/* The hero card: the search results screen. Height is content-driven, so the
+   card never shows empty space below the last result row. */
+.collage__card--search {
+  top: 3%;
+  left: 0;
+  width: 88%;
+  transform: rotate(-1.6deg);
+  z-index: 2;
+}
+
+/* Small course card, peeking out top-right for depth. */
+.collage__card--course {
+  top: 15%;
+  right: 0;
+  width: 44%;
+  transform: rotate(3deg);
+  z-index: 4;
+  box-shadow: 0 24px 44px -24px rgba(18, 33, 28, 0.4);
+}
+
+/* The carousel slide: dark, bold, overlapping the search card's bottom edge. */
+.collage__card--slide {
+  bottom: 9%;
+  left: 2%;
+  width: 78%;
+  transform: rotate(-1.2deg);
+  z-index: 5;
+  background: var(--green-800);
+  border-color: transparent;
+  padding: 13px 15px;
+  color: #fff;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  box-shadow: 0 26px 50px -24px rgba(8, 55, 43, 0.7);
+}
+
+.collage__slide-kicker {
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #9ed6c2;
+  font-weight: 700;
+}
+
+.collage__slide-text {
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  line-height: 1.25;
+}
+
+/* Miniature browser chrome so each card reads as "a real page". */
+.mini__bar {
+  height: 22px;
+  background: var(--cream-deep);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 8px;
+}
+
+.mini__bar span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.mini__body {
+  padding: 10px 11px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+/* A faux search bar with a magnifier, so the card reads instantly as search. */
+.mini__search {
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: var(--cream-deep);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-inline: 8px;
+  color: var(--ink-faint);
+}
+
+.mini__search i {
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  display: block;
+}
+
+.mini__line {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cream-deep);
+}
+
+.mini__line--w70 {
+  width: 70%;
+}
+
+.mini__line--w45 {
+  width: 45%;
+}
+
+.mini__row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.mini__thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--green-100);
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--green-700);
+}
+
+.mini__thumb--coral {
+  background: var(--coral-soft);
+  color: #a1381d;
+}
+
+.mini__hero {
+  border-radius: 8px;
+  background: var(--green-800);
+  padding: 11px 9px;
+  display: grid;
+  gap: 4px;
+}
+
+.mini__hero span {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.mini__pill {
+  height: 11px;
+  width: 40px;
+  border-radius: var(--r-pill);
+  background: var(--coral);
+}
+
+/* ---------- Deliverable cards ---------- */
+.deliverables {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.dcard {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 24px 22px 22px;
+  border-radius: var(--r-lg);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+}
+
+.dcard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--line-strong);
+}
+
+/* A coloured spine on the left edge groups each card to its prototype. */
+.dcard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--green-600);
+}
+
+.dcard--course::before {
+  background: var(--coral);
+}
+
+.dcard--workflow::before {
+  background: var(--amber);
+}
+
+.dcard__num {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+}
+
+.dcard h3 {
+  font-size: 1.32rem;
+}
+
+.dcard p {
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.dcard__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.dcard__list li {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.dcard__list svg {
+  margin-top: 3px;
+  color: var(--green-600);
+}
+
+.dcard__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-strong);
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+.dcard__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--green-700);
+}
+
+.dcard:hover .dcard__go svg {
+  transform: translateX(3px);
+}
+
+.dcard__go svg {
+  transition: transform 0.2s ease;
+}
+
+/* ---------- Strategy strip ---------- */
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pillar {
+  padding: 20px;
+  border-radius: var(--r-md);
+  background: var(--green-50);
+  border: 1px solid #d8e9e1;
+}
+
+.pillar__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--green-700);
+  border: 1px solid #d8e9e1;
+  margin-bottom: 12px;
+}
+
+.pillar h3 {
+  font-family: var(--font-ui);
+  font-size: 0.93rem;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.pillar p {
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+/* ---------- Reviewer aid table ---------- */
+.rubric {
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.rubric__row {
+  display: grid;
+  grid-template-columns: 52px 1.1fr 2fr 96px;
+  gap: 16px;
+  align-items: center;
+  padding: 15px 22px;
+  border-top: 1px solid var(--line);
+  font-size: 0.89rem;
+}
+
+.rubric__row:first-child {
+  border-top: 0;
+  background: var(--cream-deep);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.rubric__row strong {
+  font-weight: 650;
+}
+
+.rubric__weight {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--green-700);
+  font-weight: 700;
+}
+
+.rubric__bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--cream-deep);
+  overflow: hidden;
+}
+
+.rubric__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--green-600);
+}
+
+/* ---------- Note panel ---------- */
+.note {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 16px;
+  padding: 22px 24px;
+  border-radius: var(--r-md);
+  background: var(--amber-soft);
+  border: 1px solid #efdfbc;
+  font-size: 0.9rem;
+  color: #6b4c0d;
+  line-height: 1.6;
+}
+
+.note__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: var(--amber);
+  border: 1px solid #efdfbc;
+}
+
+.note strong {
+  color: #553c08;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1000px) {
+  .hero__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .collage {
+    max-width: 430px;
+  }
+
+  .pillars {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .deliverables {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .rubric__row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name weight"
+      "desc desc";
+    gap: 6px 12px;
+  }
+
+  .rubric__row > :nth-child(1) {
+    grid-area: weight;
+    font-size: 0.7rem;
+  }
+
+  .rubric__row > :nth-child(2) {
+    grid-area: name;
+  }
+
+  .rubric__row > :nth-child(3) {
+    grid-area: desc;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+  }
+
+  .rubric__row > :nth-child(4) {
+    display: none;
+  }
+
+  .rubric__row:first-child {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .pillars {
+    grid-template-columns: 1fr;
+  }
+
+  .note {
+    grid-template-columns: 1fr;
+  }
+}
