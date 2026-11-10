@@ -8,7 +8,9 @@
 
   <!-- Inter is optional polish: if this request fails (offline demo), the CSS falls back to
        system-ui, so the page still looks right. It is a <link>, not a blocking @import, so a
-       slow font server can never delay first paint. -->
+       slow font server can never delay first paint. The vendored Tailwind and Chart.js below
+       are what actually make the app work offline; only this font is fetched from the network,
+       and losing it costs nothing but a slightly different typeface. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"

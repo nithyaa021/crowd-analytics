@@ -93,8 +93,9 @@ starts the server. Or start it by hand:
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-The first run downloads `yolov8n.pt` (about 6 MB) if it is not already present. Everything after
-that is offline.
+The first run downloads `yolov8n.pt` (about 6 MB) if it is not already present. After that the app
+needs no network: Tailwind and Chart.js are vendored, and the only remote request is an optional
+Google Fonts stylesheet that falls back to the system font stack if it fails.
 
 ### Run the tests
 
@@ -141,7 +142,7 @@ crowd-analytics/
 │   ├── index.html       dashboard markup
 │   ├── app.js           fetches data, draws gauges, chart and alerts
 │   ├── style.css        dark command-centre theme
-│   └── vendor/          Tailwind + Chart.js, so the demo runs offline
+│   └── vendor/          Tailwind + Chart.js, so the layout and charts need no CDN
 ├── tests/
 │   └── test_pipeline.py 20 tests, ordered person -> zone -> analytics -> db
 ├── demo_videos/         three clips + expected_results.md
