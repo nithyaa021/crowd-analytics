@@ -102,7 +102,10 @@ Expected: `Ran 20 tests ... OK`.
 
 ## The demo clips
 
-Three self-recorded clips at three densities, in `demo_videos/`. Expected results are documented
+Three openly licensed clips at three densities, in `demo_videos/`. Each is a single continuous
+stretch cut from a Pexels video (see `demo_videos/SOURCES.csv` for the original URL, author and
+licence), so there is no scene change inside a clip and the zone polygons stay valid throughout.
+Expected results are documented
 in [`demo_videos/expected_results.md`](demo_videos/expected_results.md).
 
 | Clip | People (median / max) | Capacity | Expected alert |
@@ -231,4 +234,5 @@ their justifications, and the likely interview questions with short answers.
 ## Licence
 
 All dependencies are open source (AGPL-3.0 for Ultralytics YOLOv8, Apache-2.0 for FastAPI,
-MIT for the rest). Demo clips were recorded for this project.
+MIT for the rest). The three demo clips are stock footage from Pexels, used under the Pexels
+License; `demo_videos/SOURCES.csv` records the original title, author and URL for each.

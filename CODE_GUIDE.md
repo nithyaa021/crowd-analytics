@@ -1119,19 +1119,23 @@ Front-end experience (slide 17): live visual feedback (counters, banner, toast),
 context (chart, gauges, severity chips, evidence snapshots), responsive controls (overlay
 toggles, fullscreen, source picker).
 
-Demo data and validation (slide 19): three self-recorded clips with different densities,
-in `demo_videos/`, with the expected results documented in `demo_videos/expected_results.md`.
+Demo data and validation (slide 19): three clips at three different densities, in
+`demo_videos/`, with the expected results documented in `demo_videos/expected_results.md`.
+The clips are openly licensed stock footage from Pexels rather than phone recordings; each one
+is a single continuous stretch, and `demo_videos/SOURCES.csv` records the original URL, author
+and licence for all three. Be ready to say this plainly - it is a defensible choice, but the
+panel should hear it from you rather than discover it.
 
 Submission checklist (slide 22): GitHub repo with frontend + backend + vision engine, README,
 architecture diagram, demo dataset with expected results, and a live walkthrough.
 
-Evaluation rubric (slide 20) — and how this maps:
+Evaluation rubric (slide 20) - and how this maps:
 
 | Criterion | Weight | How this project targets it |
 | --- | --- | --- |
 | **Front-end UI/UX richness** | **60%** | Dark command-centre theme, animated KPIs, SVG ring gauges, Chart.js line chart with a capacity line, congestion banner, toast, evidence modal, full keyboard/ARIA support, responsive from 360 px |
 | Vision pipeline and accuracy | 20% | YOLOv8n + ByteTrack, tuned `conf`, `STRIDE`, honest measured accuracy + documented limitations |
-| Custom demo and realism | 10% | Three self-recorded clips at three densities, documented expected results, evidence photos |
+| Custom demo and realism | 10% | Three clips at three densities (Pexels stock footage, credited in SOURCES.csv), documented expected results, evidence photos |
 | System architecture and scope | 10% | Four clean layers, config module, single-file DB module, thin web layer, 20 tests |
 
 ---
@@ -1171,6 +1175,15 @@ crash.
 `normal.mp4` — the low-density clip — runs a full loop and produces **0** alerts while
 `crowded.mp4` produces exactly the expected alert. That is the false-positive test, and it is
 part of the demo evidence.
+
+**"Did you record the demo footage yourself?"**
+No — say it directly. The three clips are openly licensed stock footage from Pexels, and
+`demo_videos/SOURCES.csv` records the original URL, author and licence for each one. What *is*
+custom is everything around them: the choice of three density levels, the zone polygons drawn for
+each camera angle, the capacities (4 / 5 / 4) tuned so one clip alerts and two do not, and the
+measured expected-results table. If the panel pushes on it, the honest answer is that recording
+original crowd footage was not possible in the time available, and using credited stock footage
+let the effort go into the pipeline and dashboard instead — which is where 80% of the marks sit.
 
 **"How fast is it, and can you prove it?"**
 ~16 fps sustained on a 4-core laptop with no GPU, measured as a moving average over 20 frames.
