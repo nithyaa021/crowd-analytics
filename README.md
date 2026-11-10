@@ -11,6 +11,8 @@ step.
 ![python](https://img.shields.io/badge/python-3.10--3.12-blue)
 ![tests](https://img.shields.io/badge/tests-20%20passing-brightgreen)
 
+![The dashboard during a congestion alert](docs/dashboard.png)
+
 ---
 
 ## What it does
@@ -34,6 +36,10 @@ photos.
 
 Four layers, one direction of data flow. The slow vision work and the fast web responses are
 separated by a single shared object.
+
+![Architecture diagram: four layers from input to web dashboard](docs/architecture.png)
+
+The same structure as text, if you are reading this on a terminal:
 
 ```
 LAYER 1 — INPUT
@@ -139,6 +145,9 @@ crowd-analytics/
 ├── tests/
 │   └── test_pipeline.py 20 tests, ordered person -> zone -> analytics -> db
 ├── demo_videos/         three clips + expected_results.md
+├── docs/
+│   ├── architecture.png  the four-layer diagram above
+│   └── dashboard.png     screenshot of the dashboard mid-alert
 ├── zones.json           zone polygons and capacities, per clip
 ├── CODE_GUIDE.md        the full code walkthrough, file by file
 ├── requirements.txt     pinned dependencies
