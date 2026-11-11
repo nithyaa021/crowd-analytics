@@ -35,11 +35,12 @@
   --rule-strong: #36404f;
 
   /* ---------- Ink ----------
-   * --ink is 13.6:1 on --panel, --ink-2 is 7.1:1 (AAA for body), --ink-3 is 4.6:1 (AA for
-   * small text). Nothing on this page is lighter than --ink-3 except disabled controls. */
+   * Measured against every surface: --ink 13.4:1, --ink-2 7.0:1, --ink-3 5.3:1. All three clear
+   * the 4.5:1 AA floor even on --panel-3, the lightest surface they can sit on. --ink-3 was
+   * #78859a, which dropped to 4.2:1 on --panel-3 and failed AA for the small meta text. */
   --ink: #e8edf4;
   --ink-2: #a2aec0;
-  --ink-3: #78859a;
+  --ink-3: #8b97aa;
 
   /* ---------- State colour ----------
    * One hue per meaning, and each is used for a border or a dot rather than a large fill. Why:
@@ -56,11 +57,19 @@
   --crit-wash: rgba(240, 82, 82, 0.14);
   --accent-wash: rgba(76, 154, 255, 0.12);
 
-  /* ---------- Shape ---------- */
-  --radius: 4px;
-  --radius-md: 3px;
-  --radius-sm: 3px;
+  /* ---------- Shape ----------
+   * One radius per level: 10 px for every panel, 6 px for blocks inside a panel, 4 px for
+   * controls. One panel style everywhere is what makes the page read as a single console rather
+   * than a set of widgets that each chose their own corners. */
+  --radius: 10px;
+  --radius-md: 6px;
+  --radius-sm: 4px;
   --radius-pill: 999px;
+
+  /* The one shadow, used only by a panel. It is faint and always downward: a panel sits on the
+   * page, so the light comes from above. Why so faint: on a dark surface a strong shadow reads as
+   * a glow, and the page must stay calm. */
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -16px rgba(0, 0, 0, 0.9);
 
   /* ---------- Type ----------
    * A fixed scale. Why fixed: fractional sizes (10.5, 11.5) made two headings that should match
@@ -129,30 +138,43 @@ body {
 }
 
 /* ---------- The panel ----------
- * The one surface every section sits on. A hairline rule and a flat fill, no blur and no
- * shadow: a console is read straight on, and a shadow implies a card that floats over
- * something, which nothing here does. */
+ * The one surface every section sits on: a hairline border, a 10 px radius and one faint
+ * shadow. Every section on the page uses this class and nothing overrides its border or radius,
+ * which is what makes the console read as one object rather than a pile of widgets. */
 .glass {
   position: relative;
   background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-panel);
+  transition: border-color var(--dur-base) linear, box-shadow var(--dur-base) linear;
 }
 
-/* The panel header, used by every section. A rule under it separates the label from the data
- * the way a form is divided on paper. */
+/* A 2 px lift and a slightly brighter edge on hover. Small on purpose: a panel that jumps is a
+ * distraction while reading a number, and this needs to say "this is a surface" and stop. */
+@media (hover: hover) and (pointer: fine) {
+  .glass:hover {
+    border-color: var(--rule-strong);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45), 0 12px 26px -16px rgba(0, 0, 0, 0.95);
+  }
+}
+
+/* The panel header, used by every section. Same height, same padding, same rule underneath, so
+ * five panels down the right column line up with each other. */
 .panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 12px;
+  /* 12 px of side padding is a multiple of 8 minus the 4 px optical inset the title's own tick
+   * provides; the height settles at 40 px so a row of panel headers cannot shimmer. */
+  padding: 0 12px;
   border-bottom: 1px solid var(--rule);
-  min-height: 34px;
+  min-height: 40px;
 }
 
 .panel-body {
-  padding: 12px;
+  padding: 16px;
 }
 
 .section-title {
@@ -320,13 +342,14 @@ body {
 }
 
 /* ---------- Congestion banner ----------
- * A hard red bar with a left marker, not a rounded gradient pill. It reads as a strip of
- * annunciator panel: the thing that lights up when a limit is crossed. */
+ * The first thing on the page when something is wrong, and absent otherwise. A hard red bar with
+ * a left marker, not a rounded gradient pill: it reads as a strip of annunciator panel, the thing
+ * that lights up when a limit is crossed. */
 .banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: 12px;
+  padding: 12px 16px;
   border-radius: var(--radius);
   background: #2a1114;
   border: 1px solid rgba(240, 82, 82, 0.5);
@@ -336,7 +359,10 @@ body {
   font-size: var(--fs-md);
   font-weight: 600;
   letter-spacing: 0.005em;
-  animation: banner-in var(--dur-base) var(--ease-out);
+  /* Slide in from the left, which is the direction the eye arrives from, then a single soft
+   * pulse draws attention to it without a permanent blink. */
+  animation: banner-in var(--dur-base) var(--ease-out),
+             banner-glow 2.4s var(--ease-out) 0.22s 1;
 }
 
 .banner[hidden] {
@@ -344,8 +370,13 @@ body {
 }
 
 @keyframes banner-in {
-  from { opacity: 0; transform: translateX(-4px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes banner-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(240, 82, 82, 0.4); }
+  100% { box-shadow: 0 0 0 12px rgba(240, 82, 82, 0); }
 }
 
 .banner-icon {
@@ -379,16 +410,21 @@ body {
   font-size: var(--fs-sm);
 }
 
-/* ---------- KPI strip ----------
- * No cards. Four cells separated by rules, the way a readings row is printed on a panel. Why:
- * four floating boxes compete with the video for attention; one strip reads as "these belong
- * together" and takes half the vertical space. */
+/* ---------- Readings strip ----------
+ * Four cells separated by rules, the way a readings row is printed on a panel. Why one strip and
+ * not four cards: four floating boxes compete with the video for attention; one strip reads as
+ * "these belong together" and takes half the vertical space. */
 .kpi-strip {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  background: var(--panel);
+  /* The internal rules are the 1 px gap showing the rule colour through, not a border on each
+   * cell. Why: the number of cells changes (four, or five when the feed reports a speed), and
+   * border rules would need one nth-child case per breakpoint. One gap works for any count. */
+  gap: 1px;
+  background: var(--rule);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-panel);
   overflow: hidden;
 }
 
@@ -396,36 +432,40 @@ body {
   .kpi-strip {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
+  /* Five readings in one row of five, rather than 4 + 1 leaving a hole. */
+  .kpi-strip.has-speed {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 .kpi-card {
   position: relative;
-  padding: 10px 14px 12px;
+  /* Each cell paints its own fill over the strip's rule-coloured background. */
+  background: var(--panel);
+  padding: 16px;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 4px;
+  transition: background-color var(--dur-fast) linear;
 }
 
-/* The internal rules. Drawn as borders rather than gaps so the strip has one outer edge. */
-.kpi-card + .kpi-card {
-  border-left: 1px solid var(--rule);
+/* display:flex above would otherwise beat the hidden attribute, leaving an empty cell for a
+ * feed that does not report speed. */
+.kpi-card[hidden] {
+  display: none;
 }
 
-@media (max-width: 1023px) {
-  /* Two per row on a narrow screen: the second row needs a top rule, and the third cell must
-   * not also get a left border on the row boundary. */
-  .kpi-card:nth-child(3) {
-    border-left: 0;
-    border-top: 1px solid var(--rule);
-  }
-
-  .kpi-card:nth-child(4) {
-    border-top: 1px solid var(--rule);
+/* A faint lift on hover, so the strip feels like addressable cells rather than a picture. Only
+ * the background changes: moving the cell would shift the numbers under the cursor. */
+@media (hover: hover) and (pointer: fine) {
+  .kpi-card:hover {
+    background: var(--panel-2);
   }
 }
 
-/* The label comes first, the reading second: an operator reads "PEOPLE", then the value. */
+/* The label comes first, the reading second: an operator reads "PEOPLE NOW", then the value. */
 .kpi-top {
   display: flex;
   align-items: center;
@@ -445,12 +485,14 @@ body {
   text-overflow: ellipsis;
 }
 
+/* The headline. 36 px, tabular, tight leading: this is the number an operator reads from across
+ * the room, and it must be the largest thing on the page after the video. */
 .kpi-value {
   font-family: var(--font-mono);
-  font-size: var(--fs-3xl);
-  line-height: 1.1;
+  font-size: 36px;
+  line-height: 1;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
@@ -473,6 +515,14 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Under 1024 px five readings fill two columns, so the fifth would sit alone beside a hole. It
+ * spans the full width instead, which reads as a summary row rather than a missing cell. */
+@media (max-width: 1023px) {
+  .kpi-strip.has-speed .kpi-card:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+}
+
 /* The little marker beside a KPI label. A 12 px glyph, not a coloured tile: at this size a tile
  * is a block of colour with a shape lost inside it. */
 .icon-badge {
@@ -489,18 +539,6 @@ body {
 .icon-badge svg {
   width: 13px;
   height: 13px;
-}
-
-/* A KPI cell whose zone is over capacity gets a red left marker, so the strip can be read from
- * across a room without reading the number. */
-.kpi-card.is-hot::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--crit);
 }
 
 /* ---------- KPI tooltips ----------
@@ -557,6 +595,41 @@ body {
   background: #05070a;
   /* A hairline ring, so the video edge does not dissolve into the panel. */
   box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+/* The LIVE badge sits inside the frame, top left, next to nothing else. It is the video's own
+ * status, which is why it does not appear when the stream has not been attached yet. */
+.video-live {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  /* A dark translucent pill, not a solid red one: a solid fill at this size reads as an alert,
+   * and a healthy stream is not an alert. */
+  background: rgba(5, 7, 10, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.video-live .live-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.video-live[hidden] {
+  display: none;
 }
 
 .video-frame img {
@@ -646,31 +719,41 @@ body {
 }
 
 /* ---------- Overlay toggles ----------
- * A toolbar across the bottom of the frame, on a near-opaque bar. The bar is what keeps the
- * labels readable over a bright video, and the flat fill is cheaper than a blur. */
+ * A toolbar across the TOP of the frame, as the brief asks, on a near-opaque strip. The strip is
+ * what keeps the labels readable over a bright video, and a flat fill is cheaper than a blur.
+ * It shares the top edge with the LIVE badge, which sits to its left. */
 .overlay-toggles {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  top: 0;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
+  justify-content: flex-end;
+  gap: 4px;
   padding: 6px 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 7, 10, 0.82);
+  /* A gradient rather than a bar: the strip fades into the picture so the video does not lose a
+   * hard-edged band across its top. */
+  background: linear-gradient(180deg, rgba(5, 7, 10, 0.85), rgba(5, 7, 10, 0));
+  /* The strip must not eat clicks on the video area between its chips. */
+  pointer-events: none;
+}
+
+.overlay-toggles .chip {
+  pointer-events: auto;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 24px;
-  padding: 3px 8px;
+  min-height: 26px;
+  padding: 4px 9px;
   border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--ink-3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 7, 10, 0.66);
+  color: var(--ink-2);
   font: inherit;
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
@@ -689,32 +772,42 @@ body {
 
 .chip:hover {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 /* aria-pressed is the source of truth, so the visual state can never disagree with what a
- * screen reader announces. */
+ * screen reader announces. An active chip is filled with the accent: the brief asks for it, and
+ * a fill is unmistakable at a glance where a tint is not. */
 .chip[aria-pressed="true"] {
-  color: var(--ink);
-  background: rgba(76, 154, 255, 0.18);
-  border-color: rgba(76, 154, 255, 0.45);
+  color: #06101f;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .chip[aria-pressed="false"] {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .icon-button {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(5, 7, 10, 0.75);
   color: var(--ink-2);
   cursor: pointer;
   transition: background-color var(--dur-fast) linear, border-color var(--dur-fast) linear;
+}
+
+/* The fullscreen control lives at the bottom right, because the overlay chips now own the top
+ * edge of the frame. It stays above the stream so it is always reachable, like a player control. */
+.video-expand {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
 }
 
 .icon-button svg {
@@ -728,48 +821,125 @@ body {
   color: var(--ink);
 }
 
-/* ---------- Zone meters ----------
- * A horizontal bar per zone, not a ring. Why: capacity is a comparison against a limit, and a
- * bar shows "how much of the limit" directly, with the tick mark marking the limit itself. A
- * ring makes the reader estimate an angle.
+/* ---------- Zone ring gauges ----------
+ * One SVG ring per zone. Why a ring here and not a bar: a ring is the form an operator already
+ * reads as "how full is this", it carries the count in its centre, and it lets a single zone be
+ * scanned in one fixation. The bars in an earlier build needed the eye to travel left to right
+ * and then back to the number.
  *
- * The bar is inside a track, and the track is the full capacity, so a bar that overflows its
- * track is visually obvious before the number is read. */
+ * The ring is a fixed-length dashed circle with stroke-dashoffset animated to the fill fraction,
+ * which is one CSS transition rather than a redraw. */
 .zone-grid {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 4px;
 }
 
 .zone-row {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 10px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--rule);
+  /* The ring, then a text column that can shrink. */
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
   min-width: 0;
+  transition: background-color var(--dur-base) linear;
 }
 
-.zone-row:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.zone-row:first-child {
-  padding-top: 0;
-}
-
-/* A zone that is nearly full gets an amber marker, matching its chip and its bar. Why a rule
- * per state rather than one colour on the row: the marker is what an operator scans for, and
- * three states need three unambiguous marks. */
+/* The row itself tints when a zone is not OK, so the ring, the chip and the row agree. Why a
+ * background and not a left bar: the ring is already the colour signal, and a second hard marker
+ * competing with it made the panel noisy. */
 .zone-row.is-near {
-  box-shadow: inset 2px 0 0 var(--warn);
-  background: linear-gradient(90deg, var(--warn-wash), transparent 60%);
-  padding-left: 8px;
-  margin-left: -8px;
+  background: var(--warn-wash);
 }
 
-/* The zone name and its state word share the first line. */
+.zone-row.is-hot {
+  background: var(--crit-wash);
+}
+
+/* The ring: a fixed 56 px box, so a row's height never depends on its status word. */
+.zone-ring {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex: none;
+}
+
+.zone-ring svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Start the ring at twelve o'clock rather than three, which is where a dial starts. */
+  transform: rotate(-90deg);
+}
+
+/* The unfilled track and the filled arc share a geometry; only the colour and the dash offset
+ * differ. The offset is set inline as a fraction of the circumference. */
+.ring-track {
+  fill: none;
+  stroke: var(--panel-3);
+  stroke-width: 5;
+}
+
+.ring-arc {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 5;
+  stroke-linecap: round;
+  /* The fill eases, the colour eases, and neither is instant: a count that steps 7 -> 8 should
+   * look like a gauge moving, not a jump cut. */
+  transition: stroke-dashoffset var(--dur-slow) var(--ease-out),
+              stroke var(--dur-base) linear;
+}
+
+.zone-row.is-near .ring-arc {
+  stroke: var(--warn);
+}
+
+.zone-row.is-hot .ring-arc {
+  stroke: var(--crit);
+}
+
+/* The count sits in the middle of the ring: "7" large, "/ 4" small beneath it. */
+.ring-centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.ring-count {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.ring-cap {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The text column beside the ring: name and chip, then the small stat line. */
+.zone-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .zone-head {
   display: flex;
   align-items: center;
@@ -778,7 +948,7 @@ body {
 }
 
 .zone-name {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
@@ -787,33 +957,8 @@ body {
   min-width: 0;
 }
 
-/* The count on the right of the first line: "7 / 4", the reading and its limit. */
-.zone-count {
-  font-family: var(--font-mono);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--ink);
-  white-space: nowrap;
-  letter-spacing: -0.01em;
-}
-
-.zone-count .cap {
-  font-weight: 400;
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-}
-
-/* A row over capacity gets a red left marker and a faint red wash. Why both: the marker is
- * findable while scanning down the column, the wash confirms it once the eye has landed. */
-.zone-row.is-hot {
-  background: linear-gradient(90deg, var(--crit-wash), transparent 60%);
-  box-shadow: inset 2px 0 0 var(--crit);
-  padding-left: 8px;
-  margin-left: -8px;
-}
-
+/* The stat line under the name, set in mono so the numbers hold their columns across frames. */
 .zone-meta {
-  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -824,49 +969,9 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* The fill track: full width, 6 px tall. A hairline outline is what makes an empty track
- * visible at all against the panel. */
-.zone-track {
-  grid-column: 1 / -1;
-  position: relative;
-  height: 6px;
-  margin-top: 5px;
-  border-radius: 1px;
-  background: var(--panel-3);
-  box-shadow: inset 0 0 0 1px var(--rule);
-  overflow: hidden;
-}
-
-.zone-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  /* Width is set inline from the fill ratio, clamped at 1 by the renderer. */
-  background: var(--ok);
-  border-radius: 1px;
-  transition: width var(--dur-slow) var(--ease-out),
-              background-color var(--dur-base) linear;
-}
-
-/* NEAR is its own colour, not "almost red": at 80% of capacity the area is still safe, and
- * painting it the same green as an empty one would hide the warning entirely. */
-.zone-row.is-near .zone-fill {
-  background: var(--warn);
-}
-
-.zone-row.is-hot .zone-fill {
-  background: var(--crit);
-}
-
-/* The capacity tick sits at 100% of the track by definition, so instead it marks the point
- * where the zone went over: a 2 px bright edge at the end of the track. */
-.zone-track::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: -1px;
-  bottom: -1px;
-  width: 2px;
-  background: var(--rule-strong);
+/* The "over 4 s" note is the only coloured part of the stat line, and only while it applies. */
+.zone-over {
+  color: var(--crit);
 }
 
 /* ---------- Status chip ---------- */
@@ -914,17 +1019,17 @@ body {
 
 /* ---------- Alert log ---------- */
 
-/* The log scrolls inside its panel, so a long history never pushes the page down. The height is a
- * whole number of rows plus the panel's own header, so the last visible row is never cut in half -
- * a half row reads as a rendering fault rather than a scroll. A row is 35 px including its rule. */
+/* The log scrolls inside its panel, so a long history never pushes the page down. Rows are
+ * taller than before (a thumbnail, two lines of text and a button), so the visible height is set
+ * to a whole number of those rows. */
 .alert-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 0;
-  max-height: 245px;
+  max-height: 320px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -933,9 +1038,9 @@ body {
 .alert-row {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  padding: 7px 10px 7px 12px;
+  padding: 10px 12px 10px 14px;
   border-bottom: 1px solid var(--rule);
   background: transparent;
   overflow: hidden;
@@ -943,38 +1048,41 @@ body {
    * default to fit it. Without flex-shrink:0 a long history squeezes every row to a few pixels
    * instead of scrolling, which silently makes the whole log unreadable. */
   flex-shrink: 0;
+  transition: background-color var(--dur-fast) linear;
 }
 
 .alert-row:last-child {
   border-bottom: 0;
 }
 
+/* A row over capacity is tinted; a cleared row stays flat. The tint is the only difference
+ * between the two, because the left bar and the tag already say it twice. */
 .alert-row.is-active {
   background: linear-gradient(90deg, var(--crit-wash), transparent 70%);
 }
 
-/* The severity bar is absolutely positioned so it can hug the left edge. */
+/* The severity bar: 3 px, hugging the left edge, the full height of the row. It is the first
+ * thing the eye catches when scanning the log, and it survives being read on a projector. */
 .alert-sev {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: var(--ink-3);
+  width: 3px;
+  background: var(--rule-strong);
 }
 
 .alert-sev.crit { background: var(--crit); }
-.alert-sev.warn { background: var(--warn); }
-.alert-sev.ok { background: var(--ok); }
+.alert-sev.cleared { background: var(--rule-strong); }
 
-/* The thumbnail: a real keyframe when one exists, an empty frame otherwise. 30x20 is enough to
- * recognise a scene at a glance while keeping a row to one readable line. */
+/* The thumbnail: a real keyframe when one exists, an empty frame otherwise. 40x26 is enough to
+ * recognise a scene at a glance while keeping a row to one readable block. */
 .alert-thumb {
   flex: none;
-  width: 30px;
-  height: 20px;
+  width: 40px;
+  height: 26px;
   padding: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--rule);
   background: var(--panel-3);
   display: grid;
@@ -984,8 +1092,8 @@ body {
 }
 
 .alert-thumb svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   opacity: 0.7;
 }
 
@@ -1001,7 +1109,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 3px;
 }
 
 .alert-top {
@@ -1039,10 +1147,17 @@ body {
   text-overflow: ellipsis;
 }
 
-.alert-tag {
+/* The right-hand column: the tag, and under it the Acknowledge button on an active row. */
+.alert-side {
   flex: none;
-  margin-left: auto;
-  padding: 1px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.alert-tag {
+  padding: 2px 6px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
@@ -1064,21 +1179,65 @@ body {
   border: 1px solid var(--rule);
 }
 
+/* Acknowledged is deliberately grey-blue, not green: the zone may still be over capacity, and
+ * green would claim the problem is solved. Acknowledging only means a human has seen it. */
+.alert-tag.acknowledged {
+  color: var(--accent);
+  background: var(--accent-wash);
+  border: 1px solid rgba(76, 154, 255, 0.38);
+}
+
+/* The Acknowledge control: small, quiet, and only on a row that is still firing. It is a front
+ * end action only, so it changes the tag and nothing else. */
+.alert-ack {
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule-strong);
+  background: var(--panel-2);
+  color: var(--ink-2);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) linear, color var(--dur-fast) linear,
+              border-color var(--dur-fast) linear;
+}
+
+.alert-ack:hover {
+  background: var(--panel-3);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+/* An empty panel must look deliberate, not broken. The icon and the sentence are the difference
+ * between "nothing to report" and "this panel failed to load". */
 .empty-state {
   display: grid;
   place-items: center;
   gap: 8px;
-  padding: 28px 12px;
+  padding: 32px 16px;
   text-align: center;
   color: var(--ink-3);
   font-size: var(--fs-sm);
   font-weight: 400;
+  line-height: 1.5;
 }
 
 .empty-state svg {
-  width: 24px;
-  height: 24px;
-  opacity: 0.45;
+  width: 26px;
+  height: 26px;
+  opacity: 0.55;
+}
+
+/* The bold first line of a three-part empty state: what this is, then why it is empty. */
+.empty-state strong {
+  display: block;
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: var(--fs-md);
 }
 
 /* ---------- Skeletons ---------- */
@@ -1108,6 +1267,15 @@ body {
 .skeleton-value { display: block; height: 24px; width: 58%; }
 .skeleton-ring { height: 6px; width: 100%; border-radius: 1px; }
 .skeleton-row { height: 34px; border-radius: 0; }
+
+/* The circular placeholder that stands in for a ring gauge: 56 px, the same box the real ring
+ * uses, so the panel does not resize when the first snapshot arrives. */
+.skeleton-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  flex: none;
+}
 
 /* The short line under a meter skeleton: two thirds wide. */
 .skeleton-gauge-line {
@@ -1215,15 +1383,16 @@ body {
 
 /* ---------- Chart ---------- */
 
-/* The canvas needs a box with a height; Chart.js measures this element, not the canvas. */
+/* The canvas needs a box with a height; Chart.js measures this element, not the canvas. A fixed
+ * height keeps the left column stable when the line's values change. */
 .chart-box {
   position: relative;
-  height: 176px;
+  height: 200px;
 }
 
-/* A legend key is a 14 px line sample: wide enough to read, too small to look like data. */
+/* A legend key is a 16 px line sample: wide enough to read, too small to look like data. */
 .legend-swatch {
-  width: 14px;
+  width: 16px;
   height: 2px;
   border-radius: 1px;
   display: inline-block;
@@ -1566,14 +1735,17 @@ body {
 
 /* ---------- Responsive ---------- */
 
+/* Under 1024 px everything is one column. The grid already does this through Tailwind's lg:
+ * prefixes; these rules cover what Tailwind cannot: the ring gauge's internal proportions. */
+
 /* At 360-420 px the readings are the only thing that can shrink without losing meaning. */
 @media (max-width: 420px) {
   .kpi-card {
-    padding: 8px 10px 10px;
+    padding: 12px;
   }
 
   .kpi-value {
-    font-size: var(--fs-2xl);
+    font-size: 30px;
   }
 
   .kpi-label {
@@ -1595,7 +1767,7 @@ body {
 
   .banner {
     gap: 8px;
-    padding: 8px 10px;
+    padding: 12px;
     font-size: var(--fs-sm);
   }
 
@@ -1603,6 +1775,37 @@ body {
     right: 8px;
     bottom: 8px;
     max-width: calc(100vw - 16px);
+  }
+
+  /* The fullscreen control is not useful on a phone, where the browser owns the viewport. */
+  .video-expand {
+    display: none;
+  }
+
+  /* The chip labels become icon-only at this width: three labelled chips would wrap the top
+   * strip over the picture, and the icons are already distinct. */
+  .chip {
+    padding: 4px 7px;
+    font-size: 0;
+    gap: 0;
+  }
+
+  .chip svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Under 1024 px the panel bodies get a little less padding, so a single column does not waste
+ * the width the phone does not have. */
+@media (max-width: 1023px) {
+  .panel-body {
+    padding: 12px;
+  }
+
+  /* The ring stays 56 px: at 52 it stops being legible, and a phone has the width for it. */
+  .zone-row {
+    padding: 12px 4px;
   }
 }
 

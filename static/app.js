@@ -42,6 +42,19 @@ const RECONNECT_MAX_MS = 10000;
 const TOAST_MS = 5000;
 const FLASH_MS = 1600;
 
+/** Speed in px/s above this counts as free-flowing for the caption; below it, the flow is slow. */
+const SPEED_FREE_PX = 30;
+
+/**
+ * Radius and circumference of the ring gauge, in the SVG's own units.
+ *
+ * Why a constant and not a literal in the markup: the dash array and the dash offset must use the
+ * exact same circumference, or the arc stops matching the track. One constant means they cannot
+ * drift. The box is 56 px with a 5 px stroke, so a 24 px radius leaves 2 px of clearance.
+ */
+const RING_RADIUS = 24;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
 /** Fetch timeouts. A hung request must not leave a panel on a skeleton forever. */
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -75,6 +88,10 @@ const app = {
   latestZones: new Map(),
   // The alert rows currently on screen, newest first, in the API's shape
   alerts: [],
+  // Alert ids a human has acknowledged. Front end only: there is no database column for this,
+  // so the set lives in the page and is gone on reload. A Set and not a flag on the alert,
+  // because a fresh GET /api/alerts would otherwise wipe it back to unacknowledged.
+  acknowledged: new Set(),
   // The chart series. Kept here rather than in Chart.js so a source switch can clear both.
   chart: { labels: [], total: [], perZone: {} },
   // Chart.js instance, so updates replace data instead of leaking a canvas context each time.
@@ -383,7 +400,7 @@ function animateKpi(key, target, unit = "") {
 }
 
 /**
- * Writes the four KPI cards and the header FPS chip from one snapshot.
+ * Writes the KPI cards and the header FPS chip from one snapshot.
  *
  * Why this is its own function: the KPI row is the first thing anyone reads, and it is the most
  * likely place for a "NaN" to appear if a field is missing. One function means one place to fix.
@@ -398,21 +415,55 @@ function renderKpis(snapshot) {
   // otherwise drag the number down and hide a real bottleneck.
   const busiest = zones.reduce(
     (worst, zone) => ((zone.avg_dwell || 0) > (worst.avg_dwell || 0) ? zone : worst),
-    { avg_dwell: 0, name: "—" },
+    { avg_dwell: 0, name: "", avg_speed: 0 },
   );
 
   animateKpi("people", total);
   animateKpi("peak", Number(snapshot.peak_people) || 0);
   animateKpi("dwell", Number(busiest.avg_dwell) || 0, "s");
   animateKpi("fps", Number(snapshot.fps) || 0);
+  renderSpeedKpi(zones, busiest);
 
   document.querySelector('[data-kpi-caption="people"]').textContent =
     `${zones.length} zone${zones.length === 1 ? "" : "s"} monitored`;
   document.querySelector('[data-kpi-caption="dwell"]').textContent =
-    busiest.name === "—" ? "no data yet" : `longest in ${busiest.name}`;
+    busiest.name ? `longest in ${busiest.name}` : "no data yet";
 
   // The header chip mirrors the KPI so the two can never disagree.
   document.getElementById("fps-chip").textContent = (Number(snapshot.fps) || 0).toFixed(1);
+}
+
+/**
+ * Shows the speed reading, but only for a feed that actually measures speed.
+ *
+ * Why conditional: the field exists because this engine computes it, but a future feed may not.
+ * Revealing the card on the first snapshot that carries the field keeps the strip honest instead
+ * of leaving a permanent "—" cell that looks like a broken sensor.
+ *
+ * Example: zones [Main 18.4 px/s] -> card shown, "18", caption "px/s, busiest zone".
+ *
+ * @param {object[]} zones - the snapshot's zones.
+ * @param {object} busiest - the zone with the longest dwell.
+ */
+function renderSpeedKpi(zones, busiest) {
+  const card = document.getElementById("kpi-speed");
+  const reportsSpeed = zones.some((zone) => Number.isFinite(Number(zone.avg_speed)));
+  if (!card || !reportsSpeed) {
+    return;
+  }
+
+  // First sighting: reveal the cell and widen the strip to five columns.
+  if (card.hidden) {
+    card.hidden = false;
+    document.getElementById("kpi-strip").classList.add("has-speed");
+  }
+
+  // The busiest zone's speed is the interesting one, the same choice the dwell card makes.
+  const speed = Number(busiest.avg_speed) || 0;
+  animateKpi("speed", speed);
+  document.querySelector('[data-kpi-caption="speed"]').textContent =
+    speed <= 0 ? "no movement measured"
+      : `px/s in ${busiest.name}`;
 }
 
 /* ---------------------------------------------------------------------------
@@ -420,15 +471,71 @@ function renderKpis(snapshot) {
  * ------------------------------------------------------------------------- */
 
 /**
- * Builds one occupancy row per zone: name, count against capacity, a fill bar and its stats.
+ * Derives everything one gauge row displays from one zone definition and its newest reading.
  *
- * Why a bar and not a ring: capacity is a comparison against a limit, and a bar shows "how much
- * of the limit" directly. Reading a fraction off a ring means estimating an angle, which nobody
- * does accurately at a glance.
+ * Why factor this out: the row is built once and then updated twice a second, and both paths must
+ * agree on the status and the fraction. One state function means the first paint and every later
+ * paint cannot disagree.
  *
- * Why a string builder separate from the DOM write: update() calls this twice a second. Building
- * the markup and assigning it once keeps the row structure identical between frames, so the CSS
- * transition on the bar's width animates instead of restarting from nothing.
+ * @param {object} definition - { name, capacity } from /api/zones.
+ * @param {object} [live] - the newest snapshot zone, or undefined before the first message.
+ * @returns {object} the values the row renders.
+ */
+function gaugeState(definition, live) {
+  const zone = live || { count: 0, over_for: 0, avg_dwell: 0, avg_speed: 0 };
+  const count = Number(zone.count) || 0;
+  const capacity = Number(definition.capacity) || 0;
+  const status = zone.status || deriveStatus(count, capacity);
+
+  // The snapshot's own fill ratio is preferred, because it is computed next to the status and the
+  // two can never disagree. count/capacity is the fallback for the first half second.
+  const rawFill = Number.isFinite(Number(zone.fill)) && zone.fill !== undefined
+    ? Number(zone.fill)
+    : (capacity > 0 ? count / capacity : 0);
+
+  return {
+    count,
+    capacity,
+    status,
+    // Clip at 1: the ring cannot be more than a full circle, and the OVER chip already says the
+    // rest. Without the clip the arc overlaps its own start and reads as a broken gauge.
+    fraction: Math.min(Math.max(rawFill, 0), 1),
+    dwell: Number(zone.avg_dwell) || 0,
+    speed: Number(zone.avg_speed) || 0,
+    overFor: Number(zone.over_for) || 0,
+  };
+}
+
+/**
+ * Maps a status to the class that colours a row, its ring and its chip.
+ *
+ * Why a map and not two ternaries: the CSS has a rule for each of the three states, and a state
+ * with no class silently keeps the OK styling, which is how the amber ring once rendered green.
+ *
+ * @param {string} status - "OK", "NEAR" or "OVER".
+ * @returns {string} the class suffix, with its leading space, or "" for OK.
+ */
+function gaugeStateClass(status) {
+  return { OVER: " is-hot", NEAR: " is-near" }[status] || "";
+}
+
+/**
+ * Writes the small stat line under a zone name.
+ *
+ * @param {object} state - one gaugeState() result.
+ * @returns {string} the inner HTML for .zone-meta.
+ */
+function gaugeMetaMarkup(state) {
+  return `
+    <span>dwell ${formatDwell(state.dwell)}</span>
+    ${state.speed > 0 ? `<span>${formatSpeed(state.speed)}</span>` : ""}
+    ${state.status === "OVER" && state.overFor > 0
+      ? `<span class="zone-over">over ${Math.round(state.overFor)} s</span>`
+      : ""}`;
+}
+
+/**
+ * Builds the full gauge list. Only used for the first paint and for a clip change.
  *
  * @param {Map<string, object>} latest - zone name -> the newest snapshot zone.
  * @returns {string} the inner HTML for #zone-gauges.
@@ -436,53 +543,105 @@ function renderKpis(snapshot) {
 function gaugeMarkup(latest) {
   return app.zoneDefs
     .map((definition) => {
-      // A zone with no snapshot yet (the first 0.5 s, or a feed that just changed) reads 0/…
-      const live = latest.get(definition.name)
-        || { count: 0, over_for: 0, avg_dwell: 0, avg_speed: 0 };
-      const count = Number(live.count) || 0;
-      const capacity = Number(definition.capacity) || 0;
-      const status = live.status || deriveStatus(count, capacity);
-
-      // The snapshot's own fill ratio is preferred, because it is computed next to the status and
-      // the two can never disagree. count/capacity is the fallback for the first half second.
-      const rawFill = Number.isFinite(Number(live.fill)) && live.fill !== undefined
-        ? Number(live.fill)
-        : (capacity > 0 ? count / capacity : 0);
-      // Clip at 1: the bar cannot be longer than its track, and the OVER chip already says the
-      // rest. Without the clip the width goes past 100% and the bar is cut off mid-shape.
-      const fraction = Math.min(Math.max(rawFill, 0), 1);
-
-      // One state class per status, so the row, the bar and the chip all agree. Why a map and not
-      // two ternaries: the CSS has a rule for each of the three states, and a state with no class
-      // silently keeps the OK styling, which is how the amber bar once rendered green.
-      const stateClass = { OVER: " is-hot", NEAR: " is-near" }[status] || "";
-
+      const state = gaugeState(definition, latest.get(definition.name));
       return `
-        <div class="zone-row${stateClass}">
-          <div class="zone-head">
-            <span class="zone-name" title="${escapeHtml(definition.name)}">
-              ${escapeHtml(definition.name)}
-            </span>
-            <span class="status-chip ${statusClass(status)}">
-              ${statusIcon(status)}${escapeHtml(status)}
-            </span>
+        <div class="zone-row${gaugeStateClass(state.status)}"
+             data-zone="${escapeHtml(definition.name)}">
+          <div class="zone-ring">
+            ${ringMarkup(state.fraction)}
+            <div class="ring-centre">
+              <span class="ring-count">${state.count}</span>
+              <span class="ring-cap">/ ${state.capacity}</span>
+            </div>
           </div>
-          <div class="zone-count tnum">
-            ${count}<span class="cap"> / ${capacity}</span>
-          </div>
-          <div class="zone-track">
-            <div class="zone-fill" style="width:${(fraction * 100).toFixed(1)}%"></div>
-          </div>
-          <div class="zone-meta">
-            <span>dwell ${formatDwell(live.avg_dwell)}</span>
-            <span>${formatSpeed(live.avg_speed)}</span>
-            ${status === "OVER" && Number(live.over_for) > 0
-              ? `<span style="color:var(--crit)">over ${Math.round(Number(live.over_for))} s</span>`
-              : ""}
+          <div class="zone-info">
+            <div class="zone-head">
+              <span class="zone-name" title="${escapeHtml(definition.name)}">
+                ${escapeHtml(definition.name)}
+              </span>
+              <span class="status-chip ${statusClass(state.status)}">
+                ${statusIcon(state.status)}${escapeHtml(state.status)}
+              </span>
+            </div>
+            <div class="zone-meta">${gaugeMetaMarkup(state)}</div>
           </div>
         </div>`;
     })
     .join("");
+}
+
+/**
+ * Updates the existing gauge rows in place, without rebuilding them.
+ *
+ * Why not just replace innerHTML every frame: a new <circle> element has no previous dash offset,
+ * so the CSS transition never runs and the ring snaps to its new fill. Updating the attributes on
+ * the same element is what makes the gauge move smoothly, and it also stops the count from
+ * flickering as the text is re-created twice a second.
+ *
+ * @param {HTMLElement} container - the #zone-gauges element.
+ * @param {Map<string, object>} latest - zone name -> the newest snapshot zone.
+ */
+function updateGaugeRows(container, latest) {
+  app.zoneDefs.forEach((definition, index) => {
+    const row = container.children[index];
+    if (!row) {
+      return;
+    }
+    const state = gaugeState(definition, latest.get(definition.name));
+    const status = state.status;
+
+    row.className = `zone-row${gaugeStateClass(status)}`;
+
+    // The arc's offset is the only number that moves: 0 would be a full circle.
+    const arc = row.querySelector(".ring-arc");
+    if (arc) {
+      arc.setAttribute("stroke-dashoffset", (RING_CIRCUMFERENCE * (1 - state.fraction)).toFixed(1));
+    }
+
+    row.querySelector(".ring-count").textContent = String(state.count);
+    row.querySelector(".ring-cap").textContent = `/ ${state.capacity}`;
+
+    // A chip whose word changed is rebuilt; the icon and the colour are inside it.
+    const chip = row.querySelector(".status-chip");
+    if (chip && chip.textContent.trim() !== status) {
+      chip.className = `status-chip ${statusClass(status)}`;
+      chip.innerHTML = `${statusIcon(status)}${escapeHtml(status)}`;
+    }
+
+    // The meta line is short and changes rarely, so replacing it is cheaper than chasing its
+    // children one by one.
+    const meta = row.querySelector(".zone-meta");
+    const metaHtml = gaugeMetaMarkup(state);
+    if (meta && meta.innerHTML.trim() !== metaHtml.trim()) {
+      meta.innerHTML = metaHtml;
+    }
+  });
+}
+
+/**
+ * Builds the two circles of a ring gauge: the full track and the filled arc.
+ *
+ * Why stroke-dashoffset and not two SVG arcs: a dashed circle with a known circumference is one
+ * number to animate, and CSS can transition it. Path arcs would need the geometry recomputed on
+ * every frame and would not transition at all.
+ *
+ * Example with a 24 px radius: circumference 150.8. A 25% fill leaves a dash offset of 113.1,
+ * which draws a quarter circle starting at twelve o'clock.
+ *
+ * @param {number} fraction - how full the zone is, already clamped to 0..1.
+ * @returns {string} the <svg> markup.
+ */
+function ringMarkup(fraction) {
+  // The dash is the whole circumference, and the offset is how much of it is not drawn yet.
+  const offset = (RING_CIRCUMFERENCE * (1 - fraction)).toFixed(1);
+  // A 56 px box with a 28 px centre: the stroke is centred on the radius, so it stays inside.
+  return `
+    <svg viewBox="0 0 56 56" aria-hidden="true">
+      <circle class="ring-track" cx="28" cy="28" r="${RING_RADIUS}"></circle>
+      <circle class="ring-arc" cx="28" cy="28" r="${RING_RADIUS}"
+              stroke-dasharray="${RING_CIRCUMFERENCE.toFixed(1)}"
+              stroke-dashoffset="${offset}"></circle>
+    </svg>`;
 }
 
 /**
@@ -512,6 +671,10 @@ function deriveStatus(count, capacity) {
 /**
  * Writes the gauges and the summary chip into the page.
  *
+ * Why this decides between a full build and an in-place update: a rebuild is needed when the zone
+ * list itself changed (first load, clip switch), because only then do rows need adding or
+ * removing. When the rows already match, updating them in place is what lets the ring animate.
+ *
  * @param {Map<string, object>} latest - zone name -> the newest snapshot zone.
  */
 function renderGauges(latest) {
@@ -520,30 +683,35 @@ function renderGauges(latest) {
 
   if (!app.zoneDefs.length) {
     container.innerHTML = `
-      <div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" aria-hidden="true">
           <circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path>
           <path d="M12 16h.01"></path>
         </svg>
-        <span>No zones for this clip.</span>
+        <strong>No zones to monitor</strong>
+        <span>This clip has no polygons defined in zones.json.</span>
       </div>`;
     summary.textContent = "none";
     summary.style.color = "var(--ink-3)";
     return;
   }
 
-  container.innerHTML = gaugeMarkup(latest);
+  // The ring is the test for "these are real rows, not the loading skeleton": the skeleton has
+  // the same row count, so counting rows alone would send it down the update path and throw.
+  if (container.children.length === app.zoneDefs.length
+      && container.querySelector(".zone-ring")) {
+    updateGaugeRows(container, latest);
+  } else {
+    container.innerHTML = gaugeMarkup(latest);
+  }
   // Real content has arrived, so the panel is no longer waiting for a shape to replace.
   container.removeAttribute("aria-busy");
 
   // Summary chip: how many zones are over, which is the single number worth reading at a glance.
   const overCount = app.zoneDefs.filter((definition) => {
     const live = latest.get(definition.name);
-    const status = live && live.status
-      ? live.status
-      : deriveStatus(live ? live.count : 0, definition.capacity);
-    return status === "OVER";
+    return gaugeState(definition, live).status === "OVER";
   }).length;
   summary.textContent = overCount > 0 ? `${overCount}/${app.zoneDefs.length} over` : "all normal";
   summary.style.color = overCount > 0 ? "var(--crit)" : "var(--ok)";
@@ -866,12 +1034,11 @@ function normaliseAlert(raw) {
  * @returns {string} the <li> markup.
  */
 function alertRowMarkup(alert, isNew) {
-  // Severity is derived, not stored: a peak far above capacity is critical, a marginal
-  // overshoot is a warning. Deriving it keeps one source of truth for the colour.
-  const ratio = alert.capacity > 0 ? alert.peak / alert.capacity : 0;
-  const severity = alert.active ? "crit" : ratio >= 1.3 ? "crit" : "warn";
-  const tagClass = alert.active ? "active" : "cleared";
-  const tagText = alert.active ? "Active" : "Cleared";
+  // The bar is red while the alert fires and grey once it is history. Severity beyond that is
+  // already carried by the text ("peak 12 / 10") and by the tag, so a second shade of red would
+  // only add noise to a log an operator scans.
+  const severity = alert.active ? "crit" : "cleared";
+  const acknowledged = app.acknowledged.has(alert.id);
 
   // A real thumbnail when there is a keyframe, a placeholder frame otherwise. Only a real photo
   // becomes a button: opening a modal on an empty placeholder would waste the click.
@@ -905,10 +1072,60 @@ function alertRowMarkup(alert, isNew) {
           <span class="alert-time">${escapeHtml(alert.startedAt)}</span>
           <span class="alert-zone">${escapeHtml(alert.zone)}</span>
         </span>
-        <span class="alert-meta">peak ${alert.peak}/${alert.capacity}</span>
+        <span class="alert-meta">peak ${alert.peak} / ${alert.capacity}</span>
       </span>
-      <span class="alert-tag ${tagClass}">${tagText}</span>
+      <span class="alert-side">
+        ${alertTagMarkup(alert.active, acknowledged)}
+        ${alert.active && !acknowledged
+          ? `<button type="button" class="alert-ack" data-ack-id="${alert.id}"
+                     aria-label="Acknowledge the alert in ${escapeHtml(alert.zone)}">Acknowledge</button>`
+          : ""}
+      </span>
     </li>`;
+}
+
+/**
+ * Builds the state tag on the right of an alert row.
+ *
+ * Why three states and not two: an operator needs to tell "still firing", "a human has seen it"
+ * and "it ended" apart, and only the first should keep pulling the eye.
+ *
+ * @param {boolean} active - whether the alert is still firing.
+ * @param {boolean} acknowledged - whether a human has marked it seen.
+ * @returns {string} the tag markup.
+ */
+function alertTagMarkup(active, acknowledged) {
+  if (acknowledged) {
+    return `<span class="alert-tag acknowledged">Acknowledged</span>`;
+  }
+  return active
+    ? `<span class="alert-tag active">Active</span>`
+    : `<span class="alert-tag cleared">Cleared</span>`;
+}
+
+/**
+ * Repaints one existing row's state: its left bar, its tint and its right-hand column.
+ *
+ * Why one function for three callers: an alert can be acknowledged, can be cleared by the engine,
+ * and can be re-rendered from history. All three must leave the row in the same shape, so the row
+ * is never half-updated (a cleared tag next to a red bar, say).
+ *
+ * @param {HTMLElement} row - the .alert-row element.
+ * @param {object} alert - the normalised alert it represents.
+ * @param {boolean} active - the state to paint, which the caller may know more certainly.
+ */
+function paintRowState(row, alert, active) {
+  row.classList.toggle("is-active", active);
+
+  const bar = row.querySelector(".alert-sev");
+  if (bar) {
+    bar.className = `alert-sev ${active ? "crit" : "cleared"}`;
+  }
+
+  const side = row.querySelector(".alert-side");
+  if (side) {
+    side.innerHTML = alertTagMarkup(active, app.acknowledged.has(alert.id));
+  }
 }
 
 /**
@@ -966,7 +1183,8 @@ function renderAlerts(alerts, newId = 0) {
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M20 6 9 17l-5-5"></path>
         </svg>
-        <span>No alerts. All zones normal.</span>
+        <strong>No alerts. All zones normal.</strong>
+        <span>Rows appear here when a zone goes over capacity.</span>
       </li>`;
     list.removeAttribute("aria-busy");
     paintAlertSummary(alerts);
@@ -1350,6 +1568,8 @@ function attachVideo() {
   image.src = `${videoUrl()}&t=${app.videoRequest}`;
   app.videoAttached = true;
   document.getElementById("video-idle").hidden = true;
+  // The LIVE badge claims a picture is arriving, so it only appears once one has been requested.
+  document.getElementById("video-live").hidden = false;
 }
 
 /**
@@ -1527,9 +1747,7 @@ function reconcileActiveAlerts(latest) {
     const row = list.querySelector(`.alert-row[data-alert-id="${alert.id}"]`);
     if (row) {
       row.classList.remove("is-active");
-      const tag = row.querySelector(".alert-tag");
-      tag.className = "alert-tag cleared";
-      tag.textContent = "Cleared";
+      paintRowState(row, alert, false);
     }
     return { ...alert, active: false };
   });
@@ -1680,13 +1898,20 @@ function openEvidence(alert) {
 }
 
 /**
- * Wires the alert list's one delegated click handler and the modal's close controls.
+ * Wires the alert list's delegated click handlers and the modal's close controls.
  *
  * Why delegation: rows are replaced on every new alert, so per-row listeners would be created
  * and thrown away twice a second. One listener on the parent survives every re-render.
  */
 function bindAlertList() {
   document.getElementById("alert-list").addEventListener("click", (event) => {
+    // Acknowledge first: it lives inside the row, so the thumbnail check must not swallow it.
+    const ack = event.target.closest(".alert-ack");
+    if (ack) {
+      acknowledgeAlert(Number(ack.dataset.ackId));
+      return;
+    }
+
     const button = event.target.closest(".alert-thumb.is-clickable");
     if (!button) {
       return;
@@ -1706,6 +1931,32 @@ function bindAlertList() {
       modal.close();
     }
   });
+}
+
+/**
+ * Marks one alert as seen by a human and repaints just that row.
+ *
+ * Why front end only: there is no acknowledged column in the database and the brief asks for no
+ * API change. The id goes into app.acknowledged, so any later re-render keeps the state, and the
+ * row is patched in place so the scroll position survives.
+ *
+ * Example: alert 2 acknowledged -> tag becomes "Acknowledged", the button disappears.
+ *
+ * @param {number} id - the alert's id.
+ */
+function acknowledgeAlert(id) {
+  app.acknowledged.add(id);
+
+  const row = document.querySelector(`.alert-row[data-alert-id="${id}"]`);
+  if (!row) {
+    return;
+  }
+
+  const alert = app.alerts.find((item) => item.id === id);
+  const side = row.querySelector(".alert-side");
+  if (side && alert) {
+    side.innerHTML = alertTagMarkup(true, true);
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1939,11 +2190,15 @@ async function retryInitialLoad() {
  * says "working" without inventing numbers.
  */
 function showSkeletons() {
-  // One skeleton meter, built as a string so the markup cannot drift between rows.
+  // One skeleton gauge, built as a string so the markup cannot drift between rows. It uses the
+  // same 56 px circle the real ring occupies, so the panel does not jump when data lands.
   const zoneRow = `
     <div class="zone-row">
-      <div class="skeleton skeleton-line" style="width:50%"></div>
-      <div class="skeleton skeleton-ring" style="margin-top:7px"></div>
+      <div class="skeleton skeleton-circle"></div>
+      <div class="zone-info">
+        <div class="skeleton skeleton-line" style="width:52%"></div>
+        <div class="skeleton skeleton-line" style="width:34%"></div>
+      </div>
     </div>`;
   document.getElementById("zone-gauges").innerHTML = zoneRow + zoneRow;
 
@@ -1951,7 +2206,8 @@ function showSkeletons() {
   const alertRow = '<li><div class="skeleton skeleton-row"></div></li>';
   document.getElementById("alert-list").innerHTML = alertRow + alertRow + alertRow;
 
-  // A skeleton is a shape, not a number, so it is not announced: aria-busy says "waiting".
+  // A speed card may appear later, but a skeleton for it would claim the feed has the field. It
+  // stays hidden until the first snapshot says otherwise.
   ["people", "peak", "dwell", "fps"].forEach((key) => {
     const node = document.querySelector(`[data-kpi="${key}"]`);
     if (node) {

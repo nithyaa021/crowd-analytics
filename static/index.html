@@ -124,10 +124,10 @@
     </div>
 
     <!-- ============ 3. Readings strip ============
-         Four cells in one bordered strip, not four floating cards. The label comes before the
+         Four or five cells in one bordered strip, not floating cards. The label comes before the
          reading, the way a gauge is marked, so the eye lands on the number already knowing what
-         it measures. -->
-    <section aria-label="Key readings" class="kpi-strip mb-2.5">
+         it measures. The speed cell is hidden until a snapshot carries avg_speed. -->
+    <section aria-label="Key readings" class="kpi-strip mb-2" id="kpi-strip">
       <article class="kpi-card" id="kpi-people">
         <div class="kpi-top">
           <!-- data-tip is read by CSS (an instant tooltip); the icon is aria-hidden because the
@@ -194,6 +194,28 @@
         <div class="kpi-value tnum" data-kpi="fps">&mdash;</div>
         <div class="kpi-caption" data-kpi-caption="fps">frames per second</div>
       </article>
+
+      <!-- Movement speed, always the last cell. Shown only when the snapshot carries avg_speed,
+           which app.js checks on the first message: a feed that does not measure speed should not
+           show an empty card. Keeping it last means the four core readings still form a clean
+           2 by 2 on a narrow screen when this one is present. -->
+      <article class="kpi-card" id="kpi-speed" hidden>
+        <div class="kpi-top">
+          <span class="icon-badge" aria-hidden="true"
+                data-tip="Average movement of people in the busiest area, in pixels per second. The cameras are not calibrated, so this is not km/h.">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 18h16"></path>
+              <path d="M4 12h10"></path>
+              <path d="M4 6h6"></path>
+              <path d="M18 6l3 3-3 3"></path>
+            </svg>
+          </span>
+          <span class="kpi-label">Flow speed</span>
+        </div>
+        <div class="kpi-value tnum" data-kpi="speed">&mdash;</div>
+        <div class="kpi-caption" data-kpi-caption="speed">px/s, busiest zone</div>
+      </article>
     </section>
 
     <!-- ============ 4. Console grid ============
@@ -216,6 +238,13 @@
                    placeholder below is what the user sees. -->
               <img id="video" alt="Live annotated camera feed with detection boxes and zone overlays">
 
+              <!-- The stream's own LIVE badge, inside the frame, shown by app.js once the
+                   stream is attached. Hidden until then so it cannot claim a live picture. -->
+              <span class="video-live" id="video-live" hidden>
+                <span class="live-dot" aria-hidden="true"></span>
+                Live
+              </span>
+
               <!-- Shown until the stream is attached, then hidden by app.js. -->
               <div class="video-idle" id="video-idle">
                 <div>
@@ -237,10 +266,10 @@
                 </div>
               </div>
 
-              <!-- Fullscreen sits above the toolbar, top right, like a player control. -->
-              <button type="button" class="icon-button" id="fullscreen"
-                      title="Fullscreen" aria-label="Toggle fullscreen"
-                      style="position:absolute;right:8px;top:8px;z-index:2">
+              <!-- Fullscreen sits at the bottom right now that the overlay chips own the top
+                   edge, like a player control. -->
+              <button type="button" class="icon-button video-expand" id="fullscreen"
+                      title="Fullscreen" aria-label="Toggle fullscreen">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
@@ -250,10 +279,11 @@
                 </svg>
               </button>
 
-              <!-- Overlay toolbar: labels first, then the switch, the way a video switcher is
-                   laid out. Each chip is a toggle and its state is in aria-pressed. -->
+              <!-- Overlay toolbar along the top edge. Each chip is a toggle and its state is in
+                   aria-pressed, so the fill and the announcement can never disagree. -->
               <div class="overlay-toggles" role="group" aria-label="Video overlays">
-                <button type="button" class="chip" id="toggle-boxes" aria-pressed="true">
+                <button type="button" class="chip" id="toggle-boxes" aria-pressed="true"
+                        title="Detection boxes">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                        stroke-linecap="round" aria-hidden="true">
                     <rect x="3" y="3" width="8" height="8" rx="1"></rect>
@@ -261,7 +291,8 @@
                   </svg>
                   Boxes
                 </button>
-                <button type="button" class="chip" id="toggle-zones" aria-pressed="true">
+                <button type="button" class="chip" id="toggle-zones" aria-pressed="true"
+                        title="Zone polygons">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path>
@@ -270,7 +301,8 @@
                   </svg>
                   Zones
                 </button>
-                <button type="button" class="chip" id="toggle-heat" aria-pressed="false">
+                <button type="button" class="chip" id="toggle-heat" aria-pressed="false"
+                        title="Density heatmap">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 2c1.5 4 4 5.5 4 9a4 4 0 0 1-8 0c0-1.5.6-2.6 1.4-3.6"></path>
@@ -317,7 +349,7 @@
       <!-- ---------- Right column, 4/12 ---------- -->
       <div class="flex min-w-0 flex-col gap-2.5 lg:col-span-4">
 
-        <!-- Occupancy by zone. Meters, not rings: capacity is a comparison against a limit. -->
+        <!-- Occupancy by zone, one ring gauge each. -->
         <section class="glass" aria-label="Occupancy by zone">
           <div class="panel-head">
             <span class="section-title">Occupancy</span>
@@ -327,12 +359,18 @@
             <!-- Filled by renderGauges(); the placeholder shows how a skeleton looks. -->
             <div class="zone-grid" id="zone-gauges">
               <div class="zone-row">
-                <div class="skeleton skeleton-line" style="width:50%"></div>
-                <div class="skeleton skeleton-ring" style="margin-top:6px"></div>
+                <div class="skeleton skeleton-circle"></div>
+                <div class="zone-info">
+                  <div class="skeleton skeleton-line" style="width:52%"></div>
+                  <div class="skeleton skeleton-line" style="width:34%"></div>
+                </div>
               </div>
               <div class="zone-row">
-                <div class="skeleton skeleton-line" style="width:40%"></div>
-                <div class="skeleton skeleton-ring" style="margin-top:6px"></div>
+                <div class="skeleton skeleton-circle"></div>
+                <div class="zone-info">
+                  <div class="skeleton skeleton-line" style="width:46%"></div>
+                  <div class="skeleton skeleton-line" style="width:30%"></div>
+                </div>
               </div>
             </div>
           </div>
