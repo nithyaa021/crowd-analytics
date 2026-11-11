@@ -19,5 +19,9 @@ logs*.txt
 docs/_preview.pdf
 docs/_pg*.png
 
+# Word leaves a lock file behind whenever a .docx is open. It is not part of the repo.
+docs/~$*.docx
+~$*.docx
+
 # Step-by-step learning notes for me, kept on disk but not part of the submission.
 docs/explained/
